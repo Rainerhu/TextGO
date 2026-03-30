@@ -36,6 +36,9 @@
   // current text selection
   let selection: string = $state('');
 
+  // whether this is a lazy selection event (selection deferred until action click)
+  let isLazy: boolean = $state(false);
+
   // track if mouse is inside toolbar
   let mouseEntered = $state(true);
 
@@ -119,13 +122,14 @@
    *
    * @param data - toolbar setup data
    */
-  async function setup(data: { rules: Rule[]; selection: string }) {
+  async function setup(data: { rules: Rule[]; selection: string; lazy?: boolean }) {
     if (!data || !data.rules || !Array.isArray(data.rules)) {
       return;
     }
 
-    // update current selection
+    // update current selection and lazy state
     selection = data.selection || '';
+    isLazy = data.lazy || false;
 
     // map rules to actions
     actions = data.rules.map(mapToAction).filter((a) => !!a);
@@ -314,6 +318,16 @@
    */
   async function executeAction(action: Action) {
     try {
+      // if lazy selection, fetch the selection text now
+      if (isLazy && !selection) {
+        selection = await invoke('get_selection', { mouse: true });
+        if (!selection || !selection.trim()) {
+          // no text selected, hide toolbar
+          await currentWindow.hide();
+          return;
+        }
+      }
+
       // get current window placement
       const placement = await windowPlacement();
       // hide the toolbar window

@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use crate::{
-    IBEAM_CURSOR, LONG_PRESS, LONG_PRESS_DURATION, REGISTERED_SHORTCUTS, SHORTCUT_PAUSED,
-    SHORTCUT_SUSPEND,
+    IBEAM_CURSOR, LAZY_SELECTION, LONG_PRESS, LONG_PRESS_DURATION, NATIVE_SELECTION_ONLY,
+    REGISTERED_SHORTCUTS, SHORTCUT_PAUSED, SHORTCUT_SUSPEND,
 };
 use std::sync::atomic::Ordering;
 use tauri::AppHandle;
@@ -160,6 +160,20 @@ pub fn set_long_press_duration(duration: u64) -> Result<(), AppError> {
 #[tauri::command]
 pub fn set_ibeam_cursor_enabled(enabled: bool) -> Result<(), AppError> {
     IBEAM_CURSOR.store(enabled, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Set the lazy selection state.
+#[tauri::command]
+pub fn set_lazy_selection_enabled(enabled: bool) -> Result<(), AppError> {
+    LAZY_SELECTION.store(enabled, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Set the native-only selection state (skip clipboard fallback).
+#[tauri::command]
+pub fn set_native_selection_only(enabled: bool) -> Result<(), AppError> {
+    NATIVE_SELECTION_ONLY.store(enabled, Ordering::Relaxed);
     Ok(())
 }
 

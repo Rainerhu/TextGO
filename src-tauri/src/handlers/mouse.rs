@@ -2,8 +2,8 @@ use crate::commands::{get_selection, is_blocked};
 use crate::error::AppError;
 use crate::platform;
 use crate::{
-    APP_HANDLE, ENIGO, IBEAM_CURSOR, LONG_PRESS, LONG_PRESS_DURATION, SHORTCUT_PAUSED,
-    SHORTCUT_SUSPEND,
+    APP_HANDLE, ENIGO, IBEAM_CURSOR, LAZY_SELECTION, LONG_PRESS, LONG_PRESS_DURATION,
+    SHORTCUT_PAUSED, SHORTCUT_SUSPEND,
 };
 use enigo::Mouse;
 use log::debug;
@@ -282,8 +282,12 @@ fn emit_event(shortcut: &str, skip_selection: Option<bool>) -> Result<(), AppErr
             return Ok(());
         }
 
-        // emit event directly without fetching selection
-        if skip_selection.unwrap_or(false) {
+        // emit event directly without fetching selection if explicitly skipped
+        // or if lazy selection mode is enabled (defer reading until action is triggered)
+        let should_skip = skip_selection.unwrap_or(false)
+            || LAZY_SELECTION.load(std::sync::atomic::Ordering::Relaxed);
+
+        if should_skip {
             let event_data = serde_json::json!({
                 "shortcut": shortcut,
                 "selection": ""

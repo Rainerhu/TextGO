@@ -1,8 +1,8 @@
 <script lang="ts">
   import { Label, Setting, Toggle } from '$lib/components';
   import { m } from '$lib/paraglide/messages';
-  import { iBeamCursor, longPress, longPressDuration } from '$lib/stores.svelte';
-  import { CursorClickIcon, CursorTextIcon } from 'phosphor-svelte';
+  import { iBeamCursor, lazySelection, longPress, longPressDuration, nativeSelectionOnly } from '$lib/stores.svelte';
+  import { CursorClickIcon, CursorTextIcon, SelectionIcon } from 'phosphor-svelte';
 </script>
 
 <div class="flex flex-col gap-2">
@@ -10,6 +10,17 @@
     <fieldset class="flex items-center justify-between gap-1">
       <Label tip={m.ibeam_cursor_explain()} tipPlacement="duplex">{m.ibeam_cursor_enabled()}</Label>
       <Toggle bind:value={iBeamCursor.current} />
+    </fieldset>
+  </Setting>
+  <Setting icon={SelectionIcon} title={m.lazy_selection_settings()}>
+    <fieldset class="flex items-center justify-between gap-1">
+      <Label tip={m.lazy_selection_explain()} tipPlacement="duplex">{m.lazy_selection_enabled()}</Label>
+      <Toggle bind:value={lazySelection.current} />
+    </fieldset>
+    <div class="divider my-0 opacity-60"></div>
+    <fieldset class="flex items-center justify-between gap-1">
+      <Label tip={m.native_selection_only_explain()} tipPlacement="duplex">{m.native_selection_only_enabled()}</Label>
+      <Toggle bind:value={nativeSelectionOnly.current} />
     </fieldset>
   </Setting>
   <Setting icon={CursorClickIcon} title={m.long_press_settings()}>

@@ -3,6 +3,7 @@ use crate::commands::keyboard::send_copy_keys;
 use crate::commands::shortcut::ShortcutHandlerGuard;
 use crate::error::AppError;
 use crate::platform;
+use crate::NATIVE_SELECTION_ONLY;
 use log::warn;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -34,6 +35,12 @@ pub async fn get_selection(app: AppHandle, mouse: Option<bool>) -> Result<String
     }
 
     // if native API fails, fall back to clipboard method
+    // unless native-only mode is enabled (to avoid triggering copy event detection)
+    if NATIVE_SELECTION_ONLY.load(Ordering::Relaxed) {
+        warn!("Native API failed and native-only mode is enabled, returning empty");
+        return Ok(String::new());
+    }
+
     warn!("Failed to get selection natively, fallback to clipboard method");
     get_selection_fallback(app, mouse.unwrap_or(false)).await
 }

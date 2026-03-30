@@ -185,6 +185,20 @@ export const iBeamCursor = persisted<boolean>('iBeamCursor', true, {
   }
 });
 
+// whether to defer text reading until action is triggered (lazy selection)
+export const lazySelection = persisted<boolean>('lazySelection', false, {
+  onchange: (enabled) => {
+    invoke('set_lazy_selection_enabled', { enabled });
+  }
+});
+
+// whether to only use native API for text selection (skip clipboard fallback)
+export const nativeSelectionOnly = persisted<boolean>('nativeSelectionOnly', false, {
+  onchange: (enabled) => {
+    invoke('set_native_selection_only', { enabled });
+  }
+});
+
 // shortcut trigger records
 export const entries = persisted<Entry[]>('entries', []);
 

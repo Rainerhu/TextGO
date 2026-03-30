@@ -136,15 +136,95 @@ pub fn get_selection() -> Result<String, AppError> {
         // get focused element
         let focused_element = get_focused_element()?;
 
-        // get first selected text range
-        let text_range = get_selected_range(&focused_element)?;
+        // Strategy 1: try to get selected text from focused element's TextPattern
+        if let Ok(text_range) = get_selected_range(&focused_element) {
+            if let Ok(text) = text_range.GetText(-1) {
+                let text = text.to_string();
+                if !text.is_empty() {
+                    return Ok(text);
+                }
+            }
+        }
 
-        // extract text from range
-        let text = text_range
-            .GetText(-1)
-            .map_err(|_| "Failed to get text from selection")?;
+        // Strategy 2: search for Document controls with TextPattern in the foreground window
+        // This helps when the focused element itself doesn't support TextPattern
+        // but a parent/sibling Document element does (common in browsers)
+        let hwnd = GetForegroundWindow();
+        if !hwnd.is_invalid() {
+            let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_ALL)
+                .map_err(|e| format!("Failed to create UI Automation instance: {}", e))?;
 
-        Ok(text.to_string())
+            if let Ok(root_element) = automation.ElementFromHandle(hwnd) {
+                // search for Document controls with text selection
+                if let Some(text) =
+                    find_selection_in_descendants(&root_element, &automation)
+                {
+                    if !text.is_empty() {
+                        return Ok(text);
+                    }
+                }
+            }
+        }
+
+        // no selection found via UIA
+        Ok(String::new())
+    }
+}
+
+/// Search for selected text in descendant elements with TextPattern.
+/// Tries Document controls first, then any element with TextPattern.
+unsafe fn find_selection_in_descendants(
+    root_element: &IUIAutomationElement,
+    automation: &IUIAutomation,
+) -> Option<String> {
+    // try Document controls first (most likely to have text selection in browsers)
+    if let Some(text) = find_selection_by_control_type(
+        root_element,
+        automation,
+        UIA_DocumentControlTypeId.0,
+    ) {
+        return Some(text);
+    }
+
+    None
+}
+
+/// Find selected text in elements of a specific control type.
+unsafe fn find_selection_by_control_type(
+    root_element: &IUIAutomationElement,
+    automation: &IUIAutomation,
+    control_type_id: i32,
+) -> Option<String> {
+    // create property condition for specified control type
+    let condition = automation
+        .CreatePropertyCondition(UIA_ControlTypePropertyId, &control_type_id.into())
+        .ok()?;
+
+    // find first matching element
+    let element = root_element
+        .FindFirst(TreeScope_Descendants, &condition)
+        .ok()?;
+
+    // try to get TextPattern and selection
+    let text_pattern: IUIAutomationTextPattern = element
+        .GetCurrentPattern(UIA_TextPatternId)
+        .and_then(|p| p.cast())
+        .ok()?;
+
+    let text_ranges = text_pattern.GetSelection().ok()?;
+
+    if text_ranges.Length().unwrap_or(0) == 0 {
+        return None;
+    }
+
+    let range = text_ranges.GetElement(0).ok()?;
+    let text = range.GetText(-1).ok()?;
+    let text = text.to_string();
+
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
     }
 }
 

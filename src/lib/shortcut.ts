@@ -1,6 +1,6 @@
 import { execute } from '$lib/executor';
 import { matchAll, matchOne } from '$lib/matcher';
-import { shortcuts } from '$lib/stores.svelte';
+import { lazySelection, shortcuts } from '$lib/stores.svelte';
 import type { Rule } from '$lib/types';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -94,15 +94,24 @@ export class Manager {
         return;
       }
 
+      // check if this is a lazy selection event (mouse shortcut with empty selection)
+      const isLazy = lazySelection.current && isMouseShortcut(shortcut) && !selection;
+
       if (s.mode === 'toolbar') {
-        // find all matching rules
-        const rules = await matchAll(selection, s.rules);
+        let rules: Rule[];
+        if (isLazy) {
+          // in lazy mode, show all rules without matching (selection will be fetched on action click)
+          rules = s.rules;
+        } else {
+          // find all matching rules
+          rules = await matchAll(selection, s.rules);
+        }
         if (rules.length === 0) {
           console.warn('No matching rules found');
           return;
         }
         // show toolbar window
-        const payload = JSON.stringify({ rules, selection });
+        const payload = JSON.stringify({ rules, selection, lazy: isLazy });
         const mouse = isMouseShortcut(shortcut);
         if (mouse) {
           await invoke('show_toolbar', { payload, mouse });
@@ -113,6 +122,14 @@ export class Manager {
           }, 100);
         }
       } else {
+        // quiet mode
+        if (isLazy) {
+          // in lazy mode for quiet mode, fetch selection now then execute
+          selection = await invoke('get_selection', { mouse: true });
+          if (!selection || !selection.trim()) {
+            return;
+          }
+        }
         // find first matching rule
         const rule = await matchOne(selection, s.rules);
         if (rule === null) {
