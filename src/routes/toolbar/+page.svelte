@@ -494,7 +494,16 @@
 
 <main class="bg-transparent p-1 select-none">
   {#if initialized && actions.length > 0}
-    <div class="w-fit overflow-hidden rounded-box border shadow-sm" in:fly={{ y: -10, duration: 100 }}>
+    <div
+      class="w-fit overflow-hidden rounded-box border shadow-sm"
+      in:fly={{ y: -10, duration: 100 }}
+      onmouseleave={() => {
+        if (expandedFolder) {
+          expandedFolder = null;
+          resizeToFit();
+        }
+      }}
+    >
       <div
         class="flex bg-base-200/95 backdrop-blur-sm"
         class:flex-col={layout === 'horizontal'}

@@ -130,33 +130,35 @@
   function moveItem(shortcutKey: string, direction: 'up' | 'down') {
     const id = selectedIds[shortcutKey];
     if (!id) return;
-    const rules = shortcuts.current[shortcutKey]?.rules;
-    if (!rules) return;
+    const s = shortcuts.current[shortcutKey];
+    if (!s?.rules) return;
+    const rules = s.rules;
     const idx = rules.findIndex((r) => r.id === id);
     if (idx < 0) return;
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= rules.length) return;
-    // swap
+    // swap and reassign to trigger reactivity
     const temp = rules[idx];
     rules[idx] = rules[targetIdx];
     rules[targetIdx] = temp;
+    s.rules = [...rules];
   }
 
   function deleteSelected(shortcutKey: string) {
     const id = selectedIds[shortcutKey];
     if (!id) return;
-    const rules = shortcuts.current[shortcutKey]?.rules;
-    if (!rules) return;
-    const idx = rules.findIndex((r) => r.id === id);
+    const s = shortcuts.current[shortcutKey];
+    if (!s?.rules) return;
+    const idx = s.rules.findIndex((r) => r.id === id);
     if (idx < 0) return;
-    const item = rules[idx];
+    const item = s.rules[idx];
     confirm({
       title: `${m.delete()} [${item.isFolder ? item.id : (idx + 1).toString().padStart(2, '0')}]`,
       message: m.delete_confirm_message(),
       onconfirm: () => {
-        rules.splice(idx, 1);
-        if (item.isFolder && shortcuts.current[shortcutKey].groups) {
-          delete shortcuts.current[shortcutKey].groups[item.id];
+        s.rules = s.rules.filter((r) => r.id !== id);
+        if (item.isFolder && s.groups) {
+          delete s.groups[item.id];
         } else if (!item.isFolder) {
           ruleBinder?.unbind(item);
         }
