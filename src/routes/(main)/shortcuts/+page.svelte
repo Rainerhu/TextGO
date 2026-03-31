@@ -146,14 +146,23 @@
     if (!s) return;
     if (!s.groups) s.groups = {};
 
-    // if renaming, update all rules referencing the old name
-    if (folderEditName && folderEditName !== folderName) {
-      for (const rule of s.rules) {
-        if (rule.group === folderEditName) {
-          rule.group = folderName;
-        }
+    if (folderEditName) {
+      // editing existing folder — update the marker's id and config
+      if (folderEditName !== folderName) {
+        // rename: update the folder marker in rules array
+        const marker = s.rules.find((r) => r.isFolder && r.id === folderEditName);
+        if (marker) marker.id = folderName;
+        delete s.groups[folderEditName];
       }
-      delete s.groups[folderEditName];
+    } else {
+      // creating new folder — insert a folder marker at the end of rules
+      s.rules.push({
+        id: folderName,
+        shortcut: folderShortcut,
+        case: '',
+        action: '',
+        isFolder: true
+      });
     }
 
     s.groups[folderName] = { icon: folderIcon || undefined, displayMode: folderDisplayMode };
@@ -163,11 +172,10 @@
   function deleteFolder(shortcutKey: string, name: string) {
     const s = shortcuts.current[shortcutKey];
     if (!s) return;
-    // remove group assignment from all rules
-    for (const rule of s.rules) {
-      if (rule.group === name) {
-        rule.group = undefined;
-      }
+    // remove the folder marker from rules array
+    const idx = s.rules.findIndex((r) => r.isFolder && r.id === name);
+    if (idx !== -1) {
+      s.rules.splice(idx, 1);
     }
     // delete group config
     if (s.groups) {
@@ -370,46 +378,6 @@
           }}
         />
       </div>
-      <!-- folder list -->
-      {#if mode === 'toolbar' && shortcuts.current[shortcut].groups && Object.keys(shortcuts.current[shortcut].groups).length > 0}
-        <div class="mt-1 flex flex-wrap items-center gap-1">
-          {#each Object.entries(shortcuts.current[shortcut].groups) as [name, config]}
-            <span class="badge gap-1 bg-base-200 pr-0.5">
-              {#if config.icon}
-                <Icon icon={config.icon} class="size-3.5" />
-              {/if}
-              <span class="text-xs">{name}</span>
-              <button
-                class="cursor-pointer opacity-40 hover:opacity-100"
-                onclick={() => openFolderModal(shortcut, name)}
-              >
-                <PencilSimpleIcon class="size-3" />
-              </button>
-              <button
-                class="cursor-pointer opacity-40 hover:text-error hover:opacity-100"
-                onclick={() => {
-                  confirm({
-                    title: `${m.delete()}${m.rule_group()}`,
-                    message: m.delete_confirm_message(),
-                    onconfirm: () => deleteFolder(shortcut, name)
-                  });
-                }}
-              >
-                <TrashIcon class="size-3" />
-              </button>
-            </span>
-          {/each}
-        </div>
-      {/if}
-      {#if mode === 'toolbar'}
-        <button
-          class="mt-1 flex cursor-pointer items-center gap-1 text-xs opacity-40 transition-opacity hover:opacity-80"
-          onclick={() => openFolderModal(shortcut)}
-        >
-          <FolderPlusIcon class="size-3.5" />
-          {m.add()}{m.rule_group()}
-        </button>
-      {/if}
       <List
         name={m.rule()}
         hint={shortcutHint(shortcut)}
@@ -417,25 +385,68 @@
         bind:collapsed={shortcuts.current[shortcut].collapsed}
         collapsible
         oncreate={() => ruleBinder?.showModal(shortcut)}
-        ondelete={(item) => ruleBinder?.unbind(item)}
+        ondelete={(item) => {
+          if (item.isFolder) {
+            // delete folder config
+            if (shortcuts.current[shortcut].groups) {
+              delete shortcuts.current[shortcut].groups[item.id];
+            }
+          } else {
+            ruleBinder?.unbind(item);
+          }
+        }}
       >
         {#snippet title()}
           <SparkleIcon class="mx-1 size-4 opacity-60" />
           <span class="text-sm tracking-wide opacity-60">
             {#if rules.length > 0}
-              {m.rule_count({ count: rules.length })}
+              {m.rule_count({ count: rules.filter((r) => !r.isFolder).length })}
             {:else}
               {m.rule_empty()}
             {/if}
           </span>
+          {#if mode === 'toolbar'}
+            <button
+              class="ml-2 flex cursor-pointer items-center gap-0.5 text-xs opacity-40 transition-opacity hover:opacity-80"
+              onclick={(e) => {
+                e.stopPropagation();
+                openFolderModal(shortcut);
+              }}
+            >
+              <FolderPlusIcon class="size-3.5" />
+              {m.add()}{m.rule_group()}
+            </button>
+          {/if}
         {/snippet}
         {#snippet row(item)}
-          {@const { label: caseLabel, icon: caseIcon } = ruleBinder?.getCaseOption(item.case) ?? {}}
-          {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(item.action) ?? {}}
-          <div
-            class="list-col-grow grid grid-cols-12 items-center gap-4 pl-4"
-            class:opacity-40={item.disabled}
-          >
+          {#if item.isFolder}
+            <!-- folder marker row -->
+            {@const folderConfig = shortcuts.current[shortcut]?.groups?.[item.id]}
+            <div class="list-col-grow flex items-center gap-2 pl-4">
+              {#if folderConfig?.icon}
+                <Icon icon={folderConfig.icon} class="size-5 shrink-0 opacity-70" />
+              {:else}
+                <FolderPlusIcon class="size-5 shrink-0 opacity-40" />
+              {/if}
+              <span class="text-sm font-medium opacity-70">{item.id}</span>
+              <span class="badge badge-xs opacity-40">{m.rule_group()}</span>
+            </div>
+            <Button
+              icon={GearSixIcon}
+              iconWeight="fill"
+              onclick={(event) => {
+                event.stopPropagation();
+                openFolderModal(shortcut, item.id);
+              }}
+            />
+          {:else}
+            <!-- regular rule row -->
+            {@const { label: caseLabel, icon: caseIcon } = ruleBinder?.getCaseOption(item.case) ?? {}}
+            {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(item.action) ?? {}}
+            <div
+              class="list-col-grow grid grid-cols-12 items-center gap-4 pl-4"
+              class:opacity-40={item.disabled}
+            >
             <div class="col-span-5 flex items-center gap-1.5" title={caseLabel}>
               {#if item.case === ''}
                 <!-- default type -->
@@ -478,11 +489,6 @@
               {/if}
             </div>
           </div>
-          {#if item.group}
-            <span class="badge badge-sm bg-base-200 text-xs opacity-60" title={item.group}>
-              {item.group}
-            </span>
-          {/if}
           <Button
             icon={item.disabled ? ProhibitInsetIcon : ProhibitInsetIcon}
             iconClass={item.disabled ? 'rotate-90 text-error/60' : 'rotate-90 opacity-30'}
@@ -499,6 +505,7 @@
               ruleUpdater?.showModal(shortcut, item.id);
             }}
           />
+          {/if}
         {/snippet}
       </List>
     </div>

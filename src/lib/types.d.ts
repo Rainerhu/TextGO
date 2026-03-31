@@ -188,7 +188,9 @@ export type Rule = {
   clipboard?: boolean;
   /** Whether the rule is disabled. */
   disabled?: boolean;
-  /** Folder group name for toolbar display. */
+  /** Whether this item is a folder marker (not a real rule). */
+  isFolder?: boolean;
+  /** Folder group name (dynamically assigned based on position). */
   group?: string;
   /** Only show this rule in these apps (app identifiers, wildcard supported). */
   showOnlyApps?: string[];

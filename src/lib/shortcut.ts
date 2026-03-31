@@ -20,6 +20,21 @@ function wildcardMatch(pattern: string, input: string): boolean {
 }
 
 /**
+ * Compute group membership for rules based on folder marker positions.
+ * Rules after a folder marker belong to that folder until the next folder marker.
+ */
+function assignGroupsFromPosition(rules: Rule[]): Rule[] {
+  let currentGroup: string | undefined;
+  return rules.map((rule) => {
+    if (rule.isFolder) {
+      currentGroup = rule.id;
+      return rule;
+    }
+    return { ...rule, group: currentGroup };
+  });
+}
+
+/**
  * Filter rules based on the current app ID.
  * Rules with showOnlyApps are only shown if the app matches.
  * Rules with noShowApps are hidden if the app matches.
@@ -124,8 +139,9 @@ export class Manager {
         return;
       }
 
-      // filter rules by current app and remove disabled rules
-      const appFilteredRules = filterRulesByApp(s.rules, appId).filter((r) => !r.disabled);
+      // assign group membership based on folder marker positions, then filter
+      const rulesWithGroups = assignGroupsFromPosition(s.rules);
+      const appFilteredRules = filterRulesByApp(rulesWithGroups, appId).filter((r) => !r.disabled && !r.isFolder);
       if (appFilteredRules.length === 0) {
         return;
       }
