@@ -64,6 +64,7 @@
   "rule_updated_success": "Rule updated successfully!",
   "rule_group": "Folder",
   "rule_group_placeholder": "Leave empty for no grouping",
+  "rule_group_none": "No folder",
   "rule_group_icon": "Folder Icon",
   "rule_show_only_apps": "Show Only In",
   "rule_no_show_apps": "Hide In",

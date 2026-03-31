@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { alert, Binder, Button, BWList, confirm, Icon, List, Recorder, Shortcut, Toggle } from '$lib/components';
+  import { alert, Binder, Button, BWList, confirm, Icon, IconSelector, List, Modal, Radio, Recorder, Shortcut, Toggle } from '$lib/components';
   import { DBCLICK_SHORTCUT, DRAG_SHORTCUT, SHIFT_CLICK_SHORTCUT } from '$lib/constants';
   import { formatShortcut, isMouseShortcut } from '$lib/helpers';
   import { NoData } from '$lib/icons';
   import { m } from '$lib/paraglide/messages';
   import { blacklist, longPress, shortcuts } from '$lib/stores.svelte';
+  import type { DisplayMode } from '$lib/types';
   import {
     ArrowArcRightIcon,
     ArrowCircleRightIcon,
@@ -15,9 +16,11 @@
     BrowserIcon,
     ColumnsIcon,
     CursorClickIcon,
+    FolderPlusIcon,
     GearSixIcon,
     KeyboardIcon,
     MouseLeftClickIcon,
+    PencilSimpleIcon,
     ProhibitIcon,
     ProhibitInsetIcon,
     RowsIcon,
@@ -111,6 +114,66 @@
       showNoData = true;
     }, 100);
   });
+
+  // folder management modal state
+  let folderModal: Modal;
+  let folderShortcut: string = $state('');
+  let folderName: string = $state('');
+  let folderIcon: string = $state('');
+  let folderDisplayMode: DisplayMode = $state('both');
+  let folderEditName: string = $state(''); // non-empty means editing
+
+  function openFolderModal(shortcutKey: string, editName?: string) {
+    folderShortcut = shortcutKey;
+    if (editName) {
+      folderEditName = editName;
+      folderName = editName;
+      const config = shortcuts.current[shortcutKey]?.groups?.[editName];
+      folderIcon = config?.icon || '';
+      folderDisplayMode = config?.displayMode || 'both';
+    } else {
+      folderEditName = '';
+      folderName = '';
+      folderIcon = '';
+      folderDisplayMode = 'both';
+    }
+    folderModal.show();
+  }
+
+  function saveFolder() {
+    if (!folderName.trim()) return;
+    const s = shortcuts.current[folderShortcut];
+    if (!s) return;
+    if (!s.groups) s.groups = {};
+
+    // if renaming, update all rules referencing the old name
+    if (folderEditName && folderEditName !== folderName) {
+      for (const rule of s.rules) {
+        if (rule.group === folderEditName) {
+          rule.group = folderName;
+        }
+      }
+      delete s.groups[folderEditName];
+    }
+
+    s.groups[folderName] = { icon: folderIcon || undefined, displayMode: folderDisplayMode };
+    folderModal.close();
+  }
+
+  function deleteFolder(shortcutKey: string, name: string) {
+    const s = shortcuts.current[shortcutKey];
+    if (!s) return;
+    // remove group assignment from all rules
+    for (const rule of s.rules) {
+      if (rule.group === name) {
+        rule.group = undefined;
+      }
+    }
+    // delete group config
+    if (s.groups) {
+      delete s.groups[name];
+    }
+  }
 </script>
 
 <svelte:window
@@ -307,6 +370,46 @@
           }}
         />
       </div>
+      <!-- folder list -->
+      {#if mode === 'toolbar' && shortcuts.current[shortcut].groups && Object.keys(shortcuts.current[shortcut].groups).length > 0}
+        <div class="mt-1 flex flex-wrap items-center gap-1">
+          {#each Object.entries(shortcuts.current[shortcut].groups) as [name, config]}
+            <span class="badge gap-1 bg-base-200 pr-0.5">
+              {#if config.icon}
+                <Icon icon={config.icon} class="size-3.5" />
+              {/if}
+              <span class="text-xs">{name}</span>
+              <button
+                class="cursor-pointer opacity-40 hover:opacity-100"
+                onclick={() => openFolderModal(shortcut, name)}
+              >
+                <PencilSimpleIcon class="size-3" />
+              </button>
+              <button
+                class="cursor-pointer opacity-40 hover:text-error hover:opacity-100"
+                onclick={() => {
+                  confirm({
+                    title: `${m.delete()}${m.rule_group()}`,
+                    message: m.delete_confirm_message(),
+                    onconfirm: () => deleteFolder(shortcut, name)
+                  });
+                }}
+              >
+                <TrashIcon class="size-3" />
+              </button>
+            </span>
+          {/each}
+        </div>
+      {/if}
+      {#if mode === 'toolbar'}
+        <button
+          class="mt-1 flex cursor-pointer items-center gap-1 text-xs opacity-40 transition-opacity hover:opacity-80"
+          onclick={() => openFolderModal(shortcut)}
+        >
+          <FolderPlusIcon class="size-3.5" />
+          {m.add()}{m.rule_group()}
+        </button>
+      {/if}
       <List
         name={m.rule()}
         hint={shortcutHint(shortcut)}
@@ -409,3 +512,36 @@
 <Binder bind:this={ruleUpdater} />
 
 <BWList bind:this={blacklistManager} bind:list={blacklist.current} />
+
+<Modal maxWidth="28rem" icon={FolderPlusIcon} title="{folderEditName ? m.update() : m.add()}{m.rule_group()}" bind:this={folderModal}>
+  <form
+    onsubmit={(e) => {
+      e.preventDefault();
+      saveFolder();
+    }}
+  >
+    <fieldset class="fieldset mt-4 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
+        <label class="text-sm opacity-80 w-20 shrink-0">{m.type_name()}</label>
+        <input class="autofocus input input-sm grow" required bind:value={folderName} />
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm opacity-80 w-20 shrink-0">{m.rule_group_icon()}</label>
+        <IconSelector bind:icon={folderIcon} />
+        <span class="truncate text-sm opacity-50">{folderIcon || ''}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm opacity-80 w-20 shrink-0">{m.toolbar_display()}</label>
+        <div class="flex gap-3">
+          <Radio bind:group={folderDisplayMode} value="both" label={m.icon_and_label()} labelClass="text-sm" radioClass="radio-sm" />
+          <Radio bind:group={folderDisplayMode} value="icon" label={m.icon_only()} labelClass="text-sm" radioClass="radio-sm" />
+          <Radio bind:group={folderDisplayMode} value="label" label={m.label_only()} labelClass="text-sm" radioClass="radio-sm" />
+        </div>
+      </div>
+    </fieldset>
+    <div class="modal-action">
+      <button type="button" class="btn" onclick={() => folderModal?.close()}>{m.cancel()}</button>
+      <button type="submit" class="btn btn-submit">{m.confirm()}</button>
+    </div>
+  </form>
+</Modal>

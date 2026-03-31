@@ -20,7 +20,7 @@
 
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { alert, confirm, Icon, IconSelector, Label, Modal, Radio, Select, Toggle } from '$lib/components';
+  import { alert, confirm, Icon, Label, Modal, Radio, Select, Toggle } from '$lib/components';
   import { m } from '$lib/paraglide/messages';
   import { manager } from '$lib/shortcut';
   import { Loading } from '$lib/states.svelte';
@@ -69,10 +69,6 @@
       history = rule.history || false;
       clipboard = rule.clipboard || false;
       group = rule.group || '';
-      // load group config
-      const groupConfig = rule.group ? shortcuts.current[shortcut]?.groups?.[rule.group] : undefined;
-      groupIcon = groupConfig?.icon || '';
-      groupDisplayMode = groupConfig?.displayMode || 'both';
       showOnlyApps = rule.showOnlyApps?.join(', ') || '';
       noShowApps = rule.noShowApps?.join(', ') || '';
     } else {
@@ -86,8 +82,6 @@
         actionId = 'copy';
       }
       group = '';
-      groupIcon = '';
-      groupDisplayMode = 'both';
       showOnlyApps = '';
       noShowApps = '';
     }
@@ -111,10 +105,17 @@
   let clipboard: boolean = $state(false);
   // folder group name
   let group: string = $state('');
-  // folder group icon (custom SVG base64 or icon name)
-  let groupIcon: string = $state('');
-  // folder group display mode
-  let groupDisplayMode: DisplayMode = $state('both');
+  // available folder groups for current shortcut
+  let groupOptions = $derived.by(() => {
+    const options: { value: string; label: string }[] = [{ value: '', label: m.rule_group_none() }];
+    const groups = shortcuts.current[shortcut]?.groups;
+    if (groups) {
+      for (const name of Object.keys(groups)) {
+        options.push({ value: name, label: name });
+      }
+    }
+    return options;
+  });
   // app filter fields (comma-separated app identifiers)
   let showOnlyApps: string = $state('');
   let noShowApps: string = $state('');
@@ -296,12 +297,6 @@
           rule.history = history;
           rule.clipboard = clipboard;
           rule.group = group || undefined;
-          // save group config to shortcut
-          if (group) {
-            const s = shortcuts.current[shortcut];
-            if (!s.groups) s.groups = {};
-            s.groups[group] = { icon: groupIcon || undefined, displayMode: groupDisplayMode };
-          }
           rule.showOnlyApps = showOnlyApps ? showOnlyApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
           rule.noShowApps = noShowApps ? noShowApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
           break;
@@ -345,12 +340,6 @@
         showOnlyApps: showOnlyApps ? showOnlyApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
         noShowApps: noShowApps ? noShowApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined
       });
-      // save group config to shortcut
-      if (group) {
-        const s = shortcuts.current[shortcut];
-        if (!s.groups) s.groups = {};
-        s.groups[group] = { icon: groupIcon || undefined, displayMode: groupDisplayMode };
-      }
       // save history
       histories.set(shortcut, { caseId, actionId });
       alert(m.rule_added_success());
@@ -447,52 +436,12 @@
         <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_group())}">
           {m.rule_group()}
         </div>
-        <input
-          type="text"
-          class="input w-full input-sm"
-          placeholder={m.rule_group_placeholder()}
+        <Select
           bind:value={group}
+          options={groupOptions}
+          class="select-sm"
         />
       </div>
-      {#if group}
-        <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
-          <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_group_icon())}">
-            {m.rule_group_icon()}
-          </div>
-          <div class="flex items-center gap-2">
-            <IconSelector bind:icon={groupIcon} />
-            <span class="truncate text-sm opacity-60">{groupIcon || ''}</span>
-          </div>
-        </div>
-        <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
-          <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.toolbar_display())}">
-            {m.toolbar_display()}
-          </div>
-          <div class="flex gap-4">
-            <Radio
-              bind:group={groupDisplayMode}
-              value="both"
-              label={m.icon_and_label()}
-              labelClass="text-sm"
-              radioClass="radio-sm"
-            />
-            <Radio
-              bind:group={groupDisplayMode}
-              value="icon"
-              label={m.icon_only()}
-              labelClass="text-sm"
-              radioClass="radio-sm"
-            />
-            <Radio
-              bind:group={groupDisplayMode}
-              value="label"
-              label={m.label_only()}
-              labelClass="text-sm"
-              radioClass="radio-sm"
-            />
-          </div>
-        </div>
-      {/if}
       <!-- app filter -->
       <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
         <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_show_only_apps())}">
