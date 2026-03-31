@@ -7,7 +7,9 @@
   import { blacklist, longPress, shortcuts } from '$lib/stores.svelte';
   import type { DisplayMode } from '$lib/types';
   import {
+    ArrowCircleDownIcon,
     ArrowCircleRightIcon,
+    ArrowCircleUpIcon,
     ArrowClockwiseIcon,
     ArrowFatUpIcon,
     ArrowsClockwiseIcon,
@@ -23,7 +25,8 @@
     SparkleIcon,
     StackPlusIcon,
     TrashIcon,
-    WaveSineIcon
+    WaveSineIcon,
+    XCircleIcon
   } from 'phosphor-svelte';
   import { onMount, tick } from 'svelte';
   import { fly } from 'svelte/transition';
@@ -115,6 +118,55 @@
       showNoData = true;
     }, 100);
   });
+
+  // selected rule/folder ID per shortcut (for move up/down/delete)
+  let selectedIds: Record<string, string> = $state({});
+
+  function selectItem(shortcutKey: string, itemId: string) {
+    if (selectedIds[shortcutKey] === itemId) {
+      selectedIds[shortcutKey] = '';
+    } else {
+      selectedIds[shortcutKey] = itemId;
+    }
+  }
+
+  function moveItem(shortcutKey: string, direction: 'up' | 'down') {
+    const id = selectedIds[shortcutKey];
+    if (!id) return;
+    const rules = shortcuts.current[shortcutKey]?.rules;
+    if (!rules) return;
+    const idx = rules.findIndex((r) => r.id === id);
+    if (idx < 0) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= rules.length) return;
+    // swap
+    const temp = rules[idx];
+    rules[idx] = rules[targetIdx];
+    rules[targetIdx] = temp;
+  }
+
+  function deleteSelected(shortcutKey: string) {
+    const id = selectedIds[shortcutKey];
+    if (!id) return;
+    const rules = shortcuts.current[shortcutKey]?.rules;
+    if (!rules) return;
+    const idx = rules.findIndex((r) => r.id === id);
+    if (idx < 0) return;
+    const item = rules[idx];
+    confirm({
+      title: `${m.delete()} [${item.isFolder ? item.id : (idx + 1).toString().padStart(2, '0')}]`,
+      message: m.delete_confirm_message(),
+      onconfirm: () => {
+        rules.splice(idx, 1);
+        if (item.isFolder && shortcuts.current[shortcutKey].groups) {
+          delete shortcuts.current[shortcutKey].groups[item.id];
+        } else if (!item.isFolder) {
+          ruleBinder?.unbind(item);
+        }
+        selectedIds[shortcutKey] = '';
+      }
+    });
+  }
 
   // folder management modal state
   let folderModal: Modal;
@@ -440,6 +492,27 @@
               class="text-green-800"
               onclick={() => ruleBinder?.showModal(shortcut)}
             />
+            <Button
+              icon={XCircleIcon}
+              iconWeight="bold"
+              text={m.delete()}
+              class={selectedIds[shortcut] ? 'text-red-800' : 'btn-disabled'}
+              onclick={() => deleteSelected(shortcut)}
+            />
+            <Button
+              icon={ArrowCircleUpIcon}
+              iconWeight="bold"
+              text={m.move_up()}
+              class={selectedIds[shortcut] ? 'text-surface' : 'btn-disabled'}
+              onclick={() => moveItem(shortcut, 'up')}
+            />
+            <Button
+              icon={ArrowCircleDownIcon}
+              iconWeight="bold"
+              text={m.move_down()}
+              class={selectedIds[shortcut] ? 'text-surface' : 'btn-disabled'}
+              onclick={() => moveItem(shortcut, 'down')}
+            />
           </span>
         </div>
         {#if !shortcuts.current[shortcut].collapsed}
@@ -455,7 +528,13 @@
                 {@const folderConfig = shortcuts.current[shortcut]?.groups?.[item.id]}
                 {@const folderCollapsed = !!item.disabled}
                 {@const childRules = rules.filter((r) => !r.isFolder && r.group === item.id)}
-                <li class="list-row items-center rounded-none border-b border-dashed bg-base-150">
+                <li
+                  class="list-row cursor-pointer items-center rounded-none border-b border-dashed bg-base-150"
+                  onclick={() => selectItem(shortcut, item.id)}
+                >
+                  <span class="flex items-center gap-1">
+                    <input type="radio" class="pointer-events-none radio radio-xs" checked={selectedIds[shortcut] === item.id} />
+                  </span>
                   <button
                     class="flex cursor-pointer items-center gap-2 pl-2"
                     onclick={() => { item.disabled = !item.disabled; }}
@@ -496,7 +575,14 @@
                   {#each childRules as child (child.id)}
                     {@const { label: caseLabel, icon: caseIcon } = ruleBinder?.getCaseOption(child.case) ?? {}}
                     {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(child.action) ?? {}}
-                    <li class="list-row items-center rounded-none pl-8 hover:bg-base-300" class:opacity-40={child.disabled}>
+                    <li
+                      class="list-row cursor-pointer items-center rounded-none pl-8 hover:bg-base-300"
+                      class:opacity-40={child.disabled}
+                      onclick={() => selectItem(shortcut, child.id)}
+                    >
+                      <span class="flex items-center">
+                        <input type="radio" class="pointer-events-none radio radio-xs" checked={selectedIds[shortcut] === child.id} />
+                      </span>
                       <div class="list-col-grow flex items-center gap-3">
                         <div class="flex items-center gap-1.5 truncate" title={actionLabel}>
                           {#if actionIcon}
@@ -523,7 +609,14 @@
               {:else if !item.group}
                 <!-- standalone rule (not in any folder) -->
                 {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(item.action) ?? {}}
-                <li class="list-row items-center rounded-none hover:bg-base-300" class:opacity-40={item.disabled}>
+                <li
+                  class="list-row cursor-pointer items-center rounded-none hover:bg-base-300"
+                  class:opacity-40={item.disabled}
+                  onclick={() => selectItem(shortcut, item.id)}
+                >
+                  <span class="flex items-center">
+                    <input type="radio" class="pointer-events-none radio radio-xs" checked={selectedIds[shortcut] === item.id} />
+                  </span>
                   <div class="list-col-grow flex items-center gap-1.5 pl-2" title={actionLabel}>
                     {#if actionIcon}
                       <Icon icon={actionIcon} class="size-5 shrink-0" />
