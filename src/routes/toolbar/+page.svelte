@@ -127,6 +127,32 @@
 
   // currently expanded folder name
   let expandedFolder: string | null = $state(null);
+  let folderCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function openFolder(name: string) {
+    if (folderCloseTimer) {
+      clearTimeout(folderCloseTimer);
+      folderCloseTimer = null;
+    }
+    expandedFolder = name;
+    resizeToFit();
+  }
+
+  function scheduleCloseFolder() {
+    if (folderCloseTimer) clearTimeout(folderCloseTimer);
+    folderCloseTimer = setTimeout(() => {
+      expandedFolder = null;
+      resizeToFit();
+      folderCloseTimer = null;
+    }, 300);
+  }
+
+  function cancelCloseFolder() {
+    if (folderCloseTimer) {
+      clearTimeout(folderCloseTimer);
+      folderCloseTimer = null;
+    }
+  }
 
   // expanded folder actions
   let expandedActions: Action[] = $derived.by(() => {
@@ -480,6 +506,9 @@
     });
     const unlistenMouseExited = listen('toolbar-exited', () => {
       mouseEntered = false;
+      if (expandedFolder) {
+        scheduleCloseFolder();
+      }
     });
 
     return () => {
@@ -498,8 +527,7 @@
       in:fly={{ y: -10, duration: 100 }}
       onmouseleave={() => {
         if (expandedFolder) {
-          expandedFolder = null;
-          resizeToFit();
+          scheduleCloseFolder();
         }
       }}
     >
@@ -548,9 +576,11 @@
                 class:bg-btn-hover={expandedFolder === folder.name}
                 class:text-primary={expandedFolder === folder.name}
                 onmouseenter={() => {
-                  expandedFolder = folder.name;
-                  resizeToFit();
+                  openFolder(folder.name);
                 }}
+                onmouseleave={() => {
+                  scheduleCloseFolder();
+                }}}
                 title={folder.name}
               >
                 {#if showIcon && folder.icon}
@@ -581,10 +611,8 @@
             class:border-l={layout === 'vertical'}
             class:border-base-300={true}
             in:fly={{ y: layout === 'horizontal' ? -5 : 0, x: layout === 'vertical' ? -5 : 0, duration: 100 }}
-            onmouseleave={() => {
-              expandedFolder = null;
-              resizeToFit();
-            }}
+            onmouseenter={() => cancelCloseFolder()}
+            onmouseleave={() => scheduleCloseFolder()}
           >
             <div class="flex" class:flex-col={layout === 'vertical'}>
               {#each expandedActions as action (action.id)}
