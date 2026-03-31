@@ -20,7 +20,7 @@
 
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { alert, confirm, Icon, Label, Modal, Radio, Select, Toggle } from '$lib/components';
+  import { alert, confirm, Icon, IconSelector, Label, Modal, Radio, Select, Toggle } from '$lib/components';
   import { m } from '$lib/paraglide/messages';
   import { manager } from '$lib/shortcut';
   import { Loading } from '$lib/states.svelte';
@@ -459,18 +459,9 @@
           <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_group_icon())}">
             {m.rule_group_icon()}
           </div>
-          <div class="flex items-center gap-1">
-            <span class="flex size-8 shrink-0 rounded-field border bg-base-200 shadow-sm">
-              {#if groupIcon}
-                <Icon icon={groupIcon} class="m-auto size-5" />
-              {/if}
-            </span>
-            <input
-              type="text"
-              class="input w-full input-sm"
-              placeholder={m.rule_group_icon_placeholder()}
-              bind:value={groupIcon}
-            />
+          <div class="flex items-center gap-2">
+            <IconSelector bind:icon={groupIcon} />
+            <span class="truncate text-sm opacity-60">{groupIcon || ''}</span>
           </div>
         </div>
         <div class="grid grid-cols-[6rem_1fr] items-center gap-4">

@@ -65,7 +65,6 @@
   "rule_group": "Folder",
   "rule_group_placeholder": "Leave empty for no grouping",
   "rule_group_icon": "Folder Icon",
-  "rule_group_icon_placeholder": "Phosphor icon name, e.g. Folder",
   "rule_show_only_apps": "Show Only In",
   "rule_no_show_apps": "Hide In",
   "rule_app_filter_placeholder": "App identifiers, comma separated",

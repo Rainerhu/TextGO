@@ -496,12 +496,13 @@
   {#if initialized && actions.length > 0}
     <div class="w-fit overflow-hidden rounded-box border shadow-sm" in:fly={{ y: -10, duration: 100 }}>
       <div
-        class="flex w-fit bg-base-200/95 backdrop-blur-sm"
+        class="flex bg-base-200/95 backdrop-blur-sm"
         class:flex-col={layout === 'horizontal'}
+        class:flex-row={layout === 'vertical'}
         bind:this={container}
       >
         <!-- main toolbar row/column -->
-        <div class="flex w-fit" class:flex-col={layout === 'vertical'}>
+        <div class="flex" class:flex-col={layout === 'vertical'}>
           <span
             class="flex cursor-grabbing items-center opacity-20 transition-opacity"
             class:hover:opacity-90={mouseEntered}
@@ -564,11 +565,10 @@
             </button>
           {/if}
         </div>
-        <!-- expanded folder row -->
+        <!-- expanded folder actions (compact, centered) -->
         {#if expandedFolder && expandedActions.length > 0}
           <div
-            class="flex w-fit"
-            class:flex-col={layout === 'vertical'}
+            class="flex items-center justify-center"
             class:border-t={layout === 'horizontal'}
             class:border-l={layout === 'vertical'}
             class:border-base-300={true}
@@ -578,27 +578,26 @@
               resizeToFit();
             }}
           >
-            <span class="flex items-center px-1 opacity-30">
-              <LineVerticalIcon class="pointer-events-none size-3 {layout === 'vertical' ? 'rotate-90' : ''}" />
-            </span>
-            {#each expandedActions as action (action.id)}
-              {@const showIcon = action.rule.displayMode !== 'label'}
-              {@const showLabel = action.rule.displayMode !== 'icon'}
-              <button
-                class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
-                class:hover:bg-btn-hover={mouseEntered}
-                class:hover:text-primary={mouseEntered}
-                onclick={() => executeAction(action)}
-                title={action.label}
-              >
-                {#if showIcon && action.icon}
-                  <Icon icon={action.icon} class="size-4.5 shrink-0" />
-                {/if}
-                {#if showLabel}
-                  <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
-                {/if}
-              </button>
-            {/each}
+            <div class="flex" class:flex-col={layout === 'vertical'}>
+              {#each expandedActions as action (action.id)}
+                {@const showIcon = action.rule.displayMode !== 'label'}
+                {@const showLabel = action.rule.displayMode !== 'icon'}
+                <button
+                  class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                  class:hover:bg-btn-hover={mouseEntered}
+                  class:hover:text-primary={mouseEntered}
+                  onclick={() => executeAction(action)}
+                  title={action.label}
+                >
+                  {#if showIcon && action.icon}
+                    <Icon icon={action.icon} class="size-4.5 shrink-0" />
+                  {/if}
+                  {#if showLabel}
+                    <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
           </div>
         {/if}
       </div>
