@@ -1,21 +1,25 @@
 name: release
 
+# disabled — use build.yml instead (no signing key required)
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+' # matches semantic versioning tags like v1.2.3
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "release" to confirm'
+        required: true
 
 jobs:
   publish-tauri:
+    if: github.event.inputs.confirm == 'release'
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest' # for Arm based macs (M1 and above).
+          - platform: 'macos-latest'
             args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest' # for Intel based macs.
+          - platform: 'macos-latest'
             args: '--target x86_64-apple-darwin'
           - platform: 'windows-latest'
             args: ''
@@ -58,7 +62,6 @@ jobs:
       - name: setup rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - name: install pnpm
