@@ -125,7 +125,7 @@ export class Manager {
         const s = shortcuts.current[LONG_PRESS_SHORTCUT];
         if (s && !s.disabled && s.rules && s.rules.length > 0) {
           // use registered rules (same as other shortcuts)
-          const activeRules = getRulesWithGroups(s.rules).filter((r) => !r.disabled && !r.isFolder);
+          const activeRules = getRulesWithGroups(s.rules).filter((r) => !r.disabled);
           const filteredRules = filterRulesByApp(activeRules, appId);
           if (filteredRules.length > 0) {
             const layout = s.toolbarLayout || 'horizontal';

@@ -74,45 +74,44 @@
   // toolbar items: either a standalone action or a folder group
   type ToolbarItem = { type: 'action'; action: Action } | { type: 'folder'; folder: FolderGroup };
 
-  // organized toolbar items (actions + folders)
+  // organized toolbar items (actions + folders), preserving rules array order
   let toolbarItems: ToolbarItem[] = $derived.by(() => {
     const items: ToolbarItem[] = [];
     const groupMap = new Map<string, Action[]>();
-    const ungrouped: Action[] = [];
+    const addedGroups = new Set<string>();
 
-    // separate grouped and ungrouped actions, preserving order of first appearance
-    const groupOrder: string[] = [];
+    // first pass: collect grouped actions
     for (const action of actions) {
       if (action.rule.group) {
-        const groupName = action.rule.group;
-        if (!groupMap.has(groupName)) {
-          groupMap.set(groupName, []);
-          groupOrder.push(groupName);
+        if (!groupMap.has(action.rule.group)) {
+          groupMap.set(action.rule.group, []);
         }
-        groupMap.get(groupName)!.push(action);
-      } else {
-        ungrouped.push(action);
+        groupMap.get(action.rule.group)!.push(action);
       }
     }
 
-    // build toolbar items in order: ungrouped first, then folders
-    for (const action of ungrouped) {
-      items.push({ type: 'action', action });
-    }
-    for (const groupName of groupOrder) {
-      const groupActions = groupMap.get(groupName)!;
-      // get group config from shortcut store
-      const shortcutKey = groupActions[0]?.rule.shortcut;
-      const groupConfig = shortcutKey ? shortcutStore.current[shortcutKey]?.groups?.[groupName] : undefined;
-      items.push({
-        type: 'folder',
-        folder: {
-          name: groupName,
-          icon: groupConfig?.icon || FolderIcon,
-          displayMode: groupConfig?.displayMode || 'both',
-          actions: groupActions
+    // second pass: build items in order, inserting folders at first occurrence
+    for (const action of actions) {
+      if (action.rule.group) {
+        if (!addedGroups.has(action.rule.group)) {
+          addedGroups.add(action.rule.group);
+          const groupName = action.rule.group;
+          const groupActions = groupMap.get(groupName)!;
+          const shortcutKey = groupActions[0]?.rule.shortcut;
+          const groupConfig = shortcutKey ? shortcutStore.current[shortcutKey]?.groups?.[groupName] : undefined;
+          items.push({
+            type: 'folder',
+            folder: {
+              name: groupName,
+              icon: groupConfig?.icon || FolderIcon,
+              displayMode: groupConfig?.displayMode || 'both',
+              actions: groupActions
+            }
+          });
         }
-      });
+      } else {
+        items.push({ type: 'action', action });
+      }
     }
     return items;
   });
