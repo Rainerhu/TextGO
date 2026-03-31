@@ -1,6 +1,6 @@
 <script lang="ts">
   import { alert, Binder, Button, BWList, confirm, Icon, IconSelector, Modal, Radio, Recorder, Shortcut, Toggle } from '$lib/components';
-  import { CTRL_CLICK_SHORTCUT, DBCLICK_SHORTCUT, DRAG_SHORTCUT, LONG_PRESS_SHORTCUT, SHIFT_CLICK_SHORTCUT } from '$lib/constants';
+  import { DBCLICK_SHORTCUT, DRAG_SHORTCUT, LONG_PRESS_SHORTCUT, SHIFT_CLICK_SHORTCUT } from '$lib/constants';
   import { formatShortcut, isMouseShortcut } from '$lib/helpers';
   import { NoData } from '$lib/icons';
   import { m } from '$lib/paraglide/messages';
@@ -90,8 +90,6 @@
     if (b === DBCLICK_SHORTCUT) return 1;
     if (a === SHIFT_CLICK_SHORTCUT) return -1;
     if (b === SHIFT_CLICK_SHORTCUT) return 1;
-    if (a === CTRL_CLICK_SHORTCUT) return -1;
-    if (b === CTRL_CLICK_SHORTCUT) return 1;
     if (a === LONG_PRESS_SHORTCUT) return -1;
     if (b === LONG_PRESS_SHORTCUT) return 1;
     return a.localeCompare(b);
@@ -106,7 +104,6 @@
     if (shortcut === DRAG_SHORTCUT) return m.mouse_drag_hint();
     if (shortcut === DBCLICK_SHORTCUT) return m.mouse_dbclick_hint();
     if (shortcut === SHIFT_CLICK_SHORTCUT) return m.mouse_shift_click_hint();
-    if (shortcut === CTRL_CLICK_SHORTCUT) return m.mouse_ctrl_click_hint();
     if (shortcut === LONG_PRESS_SHORTCUT) return m.long_press_hint();
     return m.keyboard_shortcut_hint();
   }
@@ -271,7 +268,6 @@
             shortcuts.current[DRAG_SHORTCUT] &&
             shortcuts.current[DBCLICK_SHORTCUT] &&
             shortcuts.current[SHIFT_CLICK_SHORTCUT] &&
-            shortcuts.current[CTRL_CLICK_SHORTCUT] &&
             shortcuts.current[LONG_PRESS_SHORTCUT]
           ) {
             // all mouse shortcuts are registered, open recorder directly
@@ -329,22 +325,6 @@
               <MouseLeftClickIcon class="size-4" />
             </span>
             <span class="mx-auto tracking-wider">{m.mouse_shift_click()}</span>
-          </button>
-        </li>
-        <!-- mouse ctrl-click option -->
-        <li class={shortcuts.current[CTRL_CLICK_SHORTCUT] ? 'hidden' : ''}>
-          <button
-            class="btn px-1 btn-sm"
-            onclick={() => {
-              register(CTRL_CLICK_SHORTCUT);
-              dropdownOpen = false;
-            }}
-          >
-            <span class="flex">
-              <span class="text-xs font-bold">⌃</span>
-              <MouseLeftClickIcon class="size-4" />
-            </span>
-            <span class="mx-auto tracking-wider">{m.mouse_ctrl_click()}</span>
           </button>
         </li>
         <!-- long press option -->

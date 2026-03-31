@@ -39,8 +39,6 @@
   "mouse_dbclick_hint": "Trigger action after double-clicking to select text",
   "mouse_shift_click": "Shift-Click",
   "mouse_shift_click_hint": "Trigger action after shift-clicking to select text",
-  "mouse_ctrl_click": "Ctrl-Click",
-  "mouse_ctrl_click_hint": "Trigger action after ctrl-clicking on selected text",
   "long_press_hint": "Trigger action after long pressing on text, default shows paste",
   "keyboard_keys": "Keyboard",
   "recording_keys": "Recording Keys...",
