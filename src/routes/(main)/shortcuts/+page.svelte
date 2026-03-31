@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { alert, Binder, Button, BWList, confirm, Icon, IconSelector, List, Modal, Radio, Recorder, Shortcut, Toggle } from '$lib/components';
+  import { alert, Binder, Button, BWList, confirm, Icon, IconSelector, Modal, Radio, Recorder, Shortcut, Toggle } from '$lib/components';
   import { DBCLICK_SHORTCUT, DRAG_SHORTCUT, SHIFT_CLICK_SHORTCUT } from '$lib/constants';
   import { formatShortcut, isMouseShortcut } from '$lib/helpers';
   import { NoData } from '$lib/icons';
@@ -7,27 +7,22 @@
   import { blacklist, longPress, shortcuts } from '$lib/stores.svelte';
   import type { DisplayMode } from '$lib/types';
   import {
-    ArrowArcRightIcon,
     ArrowCircleRightIcon,
     ArrowClockwiseIcon,
-    ArrowFatLineRightIcon,
     ArrowFatUpIcon,
     ArrowsClockwiseIcon,
-    BrowserIcon,
     ColumnsIcon,
     CursorClickIcon,
     FolderPlusIcon,
     GearSixIcon,
     KeyboardIcon,
     MouseLeftClickIcon,
-    PencilSimpleIcon,
     ProhibitIcon,
     ProhibitInsetIcon,
     RowsIcon,
     SparkleIcon,
     StackPlusIcon,
     TrashIcon,
-    WarningIcon,
     WaveSineIcon
   } from 'phosphor-svelte';
   import { onMount, tick } from 'svelte';
@@ -378,136 +373,144 @@
           }}
         />
       </div>
-      <List
-        name={m.rule()}
-        hint={shortcutHint(shortcut)}
-        bind:data={shortcuts.current[shortcut].rules}
-        bind:collapsed={shortcuts.current[shortcut].collapsed}
-        collapsible
-        oncreate={() => ruleBinder?.showModal(shortcut)}
-        ondelete={(item) => {
-          if (item.isFolder) {
-            // delete folder config
-            if (shortcuts.current[shortcut].groups) {
-              delete shortcuts.current[shortcut].groups[item.id];
-            }
-          } else {
-            ruleBinder?.unbind(item);
-          }
-        }}
-      >
-        {#snippet title()}
-          <SparkleIcon class="mx-1 size-4 opacity-60" />
-          <span class="text-sm tracking-wide opacity-60">
-            {#if rules.length > 0}
+      <!-- rules list with folder grouping -->
+      <div class="mt-2 overflow-hidden rounded-box border shadow-xs">
+        <div
+          class="flex items-center justify-between gradient px-2 py-1"
+          style="border-bottom: 1px inset var(--color-border)"
+        >
+          <span class="flex items-center gap-1 text-base-content/80">
+            <Button class="swap swap-rotate {shortcuts.current[shortcut].collapsed ? '' : 'swap-active'}" onclick={() => (shortcuts.current[shortcut].collapsed = !shortcuts.current[shortcut].collapsed)}>
+              <span class="swap-on"><SparkleIcon class="size-4.5" /></span>
+              <span class="swap-off"><SparkleIcon class="size-4.5" /></span>
+            </Button>
+            <span class="text-sm tracking-wide opacity-60">
               {m.rule_count({ count: rules.filter((r) => !r.isFolder).length })}
-            {:else}
-              {m.rule_empty()}
-            {/if}
+            </span>
           </span>
-          {#if mode === 'toolbar'}
-            <button
-              class="ml-2 flex cursor-pointer items-center gap-0.5 text-xs opacity-40 transition-opacity hover:opacity-80"
-              onclick={(e) => {
-                e.stopPropagation();
-                openFolderModal(shortcut);
-              }}
-            >
-              <FolderPlusIcon class="size-3.5" />
-              {m.add()}{m.rule_group()}
-            </button>
-          {/if}
-        {/snippet}
-        {#snippet row(item)}
-          {#if item.isFolder}
-            <!-- folder marker row -->
-            {@const folderConfig = shortcuts.current[shortcut]?.groups?.[item.id]}
-            <div class="list-col-grow flex items-center gap-2 pl-4">
-              {#if folderConfig?.icon}
-                <Icon icon={folderConfig.icon} class="size-5 shrink-0 opacity-70" />
-              {:else}
-                <FolderPlusIcon class="size-5 shrink-0 opacity-40" />
-              {/if}
-              <span class="text-sm font-medium opacity-70">{item.id}</span>
-              <span class="badge badge-xs opacity-40">{m.rule_group()}</span>
-            </div>
+          <span class="flex items-center gap-1">
             <Button
-              icon={GearSixIcon}
-              iconWeight="fill"
-              onclick={(event) => {
-                event.stopPropagation();
-                openFolderModal(shortcut, item.id);
-              }}
+              icon={FolderPlusIcon}
+              iconWeight="bold"
+              text="{m.add()}{m.rule_group()}"
+              class="text-emphasis"
+              onclick={() => openFolderModal(shortcut)}
             />
-          {:else}
-            <!-- regular rule row -->
-            {@const { label: caseLabel, icon: caseIcon } = ruleBinder?.getCaseOption(item.case) ?? {}}
-            {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(item.action) ?? {}}
-            <div
-              class="list-col-grow grid grid-cols-12 items-center gap-4 pl-4"
-              class:opacity-40={item.disabled}
-            >
-            <div class="col-span-5 flex items-center gap-1.5" title={caseLabel}>
-              {#if item.case === ''}
-                <!-- default type -->
-                <ArrowArcRightIcon class="size-5 shrink-0 opacity-30" />
-                <span class="truncate opacity-30">{caseLabel}</span>
-              {:else if !caseLabel}
-                <!-- invalid type -->
-                <WarningIcon class="size-5 shrink-0 opacity-50" />
-                <span class="truncate line-through opacity-50">
-                  {item.case.substring(item.case.indexOf('-') + 1)}
-                </span>
-              {:else}
-                <!-- valid type -->
-                {#if caseIcon}
-                  <Icon icon={caseIcon} class="size-5 shrink-0" />
+            <Button
+              icon={StackPlusIcon}
+              iconWeight="bold"
+              text="{m.add()}{m.rule()}"
+              class="text-green-800"
+              onclick={() => ruleBinder?.showModal(shortcut)}
+            />
+          </span>
+        </div>
+        {#if !shortcuts.current[shortcut].collapsed}
+          <ul class="list overflow-y-auto bg-base-100 scrollbar-none [&_.list-row]:min-h-10 [&_.list-row]:py-1">
+            {#if rules.length === 0}
+              <li class="list-row mx-auto items-center gap-1 text-surface/35">
+                {shortcutHint(shortcut)}
+              </li>
+            {/if}
+            {#each rules as item, index (item.id)}
+              {#if item.isFolder}
+                <!-- folder header row -->
+                {@const folderConfig = shortcuts.current[shortcut]?.groups?.[item.id]}
+                {@const folderCollapsed = !!item.disabled}
+                {@const childRules = rules.filter((r) => !r.isFolder && r.group === item.id)}
+                <li class="list-row items-center rounded-none border-b border-dashed bg-base-150">
+                  <button
+                    class="flex cursor-pointer items-center gap-2 pl-2"
+                    onclick={() => { item.disabled = !item.disabled; }}
+                  >
+                    <span class="text-xs opacity-40">{folderCollapsed ? '▶' : '▼'}</span>
+                    {#if folderConfig?.icon}
+                      <Icon icon={folderConfig.icon} class="size-5 shrink-0 opacity-70" />
+                    {:else}
+                      <FolderPlusIcon class="size-5 shrink-0 opacity-40" />
+                    {/if}
+                    <span class="text-sm font-medium opacity-70">{item.id}</span>
+                    <span class="badge badge-xs opacity-30">{childRules.length}</span>
+                  </button>
+                  <span class="ml-auto flex items-center gap-1">
+                    <Button
+                      icon={GearSixIcon}
+                      iconWeight="fill"
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        openFolderModal(shortcut, item.id);
+                      }}
+                    />
+                    <Button
+                      icon={TrashIcon}
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        confirm({
+                          title: `${m.delete()}${m.rule_group()} [${item.id}]`,
+                          message: m.delete_confirm_message(),
+                          onconfirm: () => deleteFolder(shortcut, item.id)
+                        });
+                      }}
+                    />
+                  </span>
+                </li>
+                <!-- folder child rules (shown when expanded) -->
+                {#if !folderCollapsed}
+                  {#each childRules as child (child.id)}
+                    {@const { label: caseLabel, icon: caseIcon } = ruleBinder?.getCaseOption(child.case) ?? {}}
+                    {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(child.action) ?? {}}
+                    <li class="list-row items-center rounded-none pl-8 hover:bg-base-300" class:opacity-40={child.disabled}>
+                      <div class="list-col-grow flex items-center gap-3">
+                        <div class="flex items-center gap-1.5 truncate" title={actionLabel}>
+                          {#if actionIcon}
+                            <Icon icon={actionIcon} class="size-5 shrink-0" />
+                          {/if}
+                          <span class="truncate text-sm opacity-80">{actionLabel || child.action}</span>
+                        </div>
+                      </div>
+                      <span class="flex items-center gap-1">
+                        <Button
+                          icon={GearSixIcon}
+                          iconWeight="fill"
+                          onclick={() => ruleUpdater?.showModal(shortcut, child.id)}
+                        />
+                        <Toggle
+                          value={!child.disabled}
+                          toggleClass="toggle-xs"
+                          onchange={() => { child.disabled = !child.disabled; }}
+                        />
+                      </span>
+                    </li>
+                  {/each}
                 {/if}
-                <span class="truncate opacity-80">{caseLabel}</span>
+              {:else if !item.group}
+                <!-- standalone rule (not in any folder) -->
+                {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(item.action) ?? {}}
+                <li class="list-row items-center rounded-none hover:bg-base-300" class:opacity-40={item.disabled}>
+                  <div class="list-col-grow flex items-center gap-1.5 pl-2" title={actionLabel}>
+                    {#if actionIcon}
+                      <Icon icon={actionIcon} class="size-5 shrink-0" />
+                    {/if}
+                    <span class="truncate text-sm opacity-80">{actionLabel || item.action}</span>
+                  </div>
+                  <span class="flex items-center gap-1">
+                    <Button
+                      icon={GearSixIcon}
+                      iconWeight="fill"
+                      onclick={() => ruleUpdater?.showModal(shortcut, item.id)}
+                    />
+                    <Toggle
+                      value={!item.disabled}
+                      toggleClass="toggle-xs"
+                      onchange={() => { item.disabled = !item.disabled; }}
+                    />
+                  </span>
+                </li>
               {/if}
-            </div>
-            <div class="col-span-1 flex items-center justify-center">
-              <ArrowFatLineRightIcon class="size-5 shrink-0 opacity-15" />
-            </div>
-            <div class="col-span-6 flex items-center gap-1.5" title={actionLabel}>
-              {#if item.action === ''}
-                <!-- default action -->
-                <BrowserIcon class="size-5 shrink-0 opacity-30" />
-                <span class="truncate opacity-30">{actionLabel}</span>
-              {:else if !actionLabel}
-                <!-- invalid action -->
-                <WarningIcon class="size-5 shrink-0 opacity-50" />
-                <span class="truncate line-through opacity-50">
-                  {item.action.substring(item.action.indexOf('-') + 1)}
-                </span>
-              {:else}
-                <!-- valid action -->
-                {#if actionIcon}
-                  <Icon icon={actionIcon} class="size-5 shrink-0" />
-                {/if}
-                <span class="truncate opacity-80">{actionLabel}</span>
-              {/if}
-            </div>
-          </div>
-          <Button
-            icon={item.disabled ? ProhibitInsetIcon : ProhibitInsetIcon}
-            iconClass={item.disabled ? 'rotate-90 text-error/60' : 'rotate-90 opacity-30'}
-            onclick={(event) => {
-              event.stopPropagation();
-              item.disabled = !item.disabled;
-            }}
-          />
-          <Button
-            icon={GearSixIcon}
-            iconWeight="fill"
-            onclick={(event) => {
-              event.stopPropagation();
-              ruleUpdater?.showModal(shortcut, item.id);
-            }}
-          />
-          {/if}
-        {/snippet}
-      </List>
+            {/each}
+          </ul>
+        {/if}
+      </div>
     </div>
   {/each}
 </div>
