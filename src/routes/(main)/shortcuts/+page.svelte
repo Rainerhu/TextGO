@@ -132,16 +132,15 @@
     if (!id) return;
     const s = shortcuts.current[shortcutKey];
     if (!s?.rules) return;
-    const rules = s.rules;
+    const rules = [...s.rules];
     const idx = rules.findIndex((r) => r.id === id);
     if (idx < 0) return;
     const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= rules.length) return;
-    // swap and reassign to trigger reactivity
-    const temp = rules[idx];
-    rules[idx] = rules[targetIdx];
-    rules[targetIdx] = temp;
-    s.rules = [...rules];
+    // swap
+    [rules[idx], rules[targetIdx]] = [rules[targetIdx], rules[idx]];
+    // force full reassignment to trigger store persistence
+    shortcuts.current = { ...shortcuts.current, [shortcutKey]: { ...s, rules } };
   }
 
   function deleteSelected(shortcutKey: string) {
@@ -156,12 +155,14 @@
       title: `${m.delete()} [${item.isFolder ? item.id : (idx + 1).toString().padStart(2, '0')}]`,
       message: m.delete_confirm_message(),
       onconfirm: () => {
-        s.rules = s.rules.filter((r) => r.id !== id);
-        if (item.isFolder && s.groups) {
-          delete s.groups[item.id];
-        } else if (!item.isFolder) {
+        const newRules = s.rules.filter((r) => r.id !== id);
+        const newGroups = { ...s.groups };
+        if (item.isFolder) {
+          delete newGroups[item.id];
+        } else {
           ruleBinder?.unbind(item);
         }
+        shortcuts.current = { ...shortcuts.current, [shortcutKey]: { ...s, rules: newRules, groups: newGroups } };
         selectedIds[shortcutKey] = '';
       }
     });
@@ -196,43 +197,45 @@
     if (!folderName.trim()) return;
     const s = shortcuts.current[folderShortcut];
     if (!s) return;
-    if (!s.groups) s.groups = {};
+    const newGroups = { ...(s.groups || {}) };
+    let newRules = [...s.rules];
 
     if (folderEditName) {
-      // editing existing folder — update the marker's id and config
+      // editing existing folder
       if (folderEditName !== folderName) {
         // rename: update the folder marker in rules array
-        const marker = s.rules.find((r) => r.isFolder && r.id === folderEditName);
-        if (marker) marker.id = folderName;
-        delete s.groups[folderEditName];
+        newRules = newRules.map((r) =>
+          r.isFolder && r.id === folderEditName ? { ...r, id: folderName } : r
+        );
+        // also update rules that reference the old folder name
+        newRules = newRules.map((r) =>
+          !r.isFolder && r.group === folderEditName ? { ...r, group: folderName } : r
+        );
+        delete newGroups[folderEditName];
       }
     } else {
-      // creating new folder — insert a folder marker at the end of rules
-      s.rules.push({
+      // creating new folder — insert a folder marker at the end
+      newRules = [...newRules, {
         id: folderName,
         shortcut: folderShortcut,
         case: '',
         action: '',
         isFolder: true
-      });
+      }];
     }
 
-    s.groups[folderName] = { icon: folderIcon || undefined, displayMode: folderDisplayMode };
+    newGroups[folderName] = { icon: folderIcon || undefined, displayMode: folderDisplayMode };
+    shortcuts.current = { ...shortcuts.current, [folderShortcut]: { ...s, rules: newRules, groups: newGroups } };
     folderModal.close();
   }
 
   function deleteFolder(shortcutKey: string, name: string) {
     const s = shortcuts.current[shortcutKey];
     if (!s) return;
-    // remove the folder marker from rules array
-    const idx = s.rules.findIndex((r) => r.isFolder && r.id === name);
-    if (idx !== -1) {
-      s.rules.splice(idx, 1);
-    }
-    // delete group config
-    if (s.groups) {
-      delete s.groups[name];
-    }
+    const newRules = s.rules.filter((r) => !(r.isFolder && r.id === name));
+    const newGroups = { ...s.groups };
+    delete newGroups[name];
+    shortcuts.current = { ...shortcuts.current, [shortcutKey]: { ...s, rules: newRules, groups: newGroups } };
   }
 </script>
 
