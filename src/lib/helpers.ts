@@ -1,4 +1,4 @@
-import { DBCLICK_SHORTCUT, DRAG_SHORTCUT, SHIFT_CLICK_SHORTCUT } from '$lib/constants';
+import { CTRL_CLICK_SHORTCUT, DBCLICK_SHORTCUT, DRAG_SHORTCUT, LONG_PRESS_SHORTCUT, SHIFT_CLICK_SHORTCUT } from '$lib/constants';
 import { m } from '$lib/paraglide/messages';
 import { getLocale, locales } from '$lib/paraglide/runtime';
 import { invoke } from '@tauri-apps/api/core';
@@ -74,7 +74,13 @@ export function getKbdLabel(code: string): string {
  * @returns true if mouse shortcut, false otherwise
  */
 export function isMouseShortcut(shortcut: string): boolean {
-  return shortcut === DRAG_SHORTCUT || shortcut === DBCLICK_SHORTCUT || shortcut === SHIFT_CLICK_SHORTCUT;
+  return (
+    shortcut === DRAG_SHORTCUT ||
+    shortcut === DBCLICK_SHORTCUT ||
+    shortcut === SHIFT_CLICK_SHORTCUT ||
+    shortcut === CTRL_CLICK_SHORTCUT ||
+    shortcut === LONG_PRESS_SHORTCUT
+  );
 }
 
 /**
@@ -90,6 +96,10 @@ export function formatShortcut(shortcut: string): string {
     return m.mouse_dbclick();
   } else if (shortcut === SHIFT_CLICK_SHORTCUT) {
     return m.mouse_shift_click();
+  } else if (shortcut === CTRL_CLICK_SHORTCUT) {
+    return m.mouse_ctrl_click();
+  } else if (shortcut === LONG_PRESS_SHORTCUT) {
+    return m.long_press_enabled();
   }
   return shortcut
     .split('+')

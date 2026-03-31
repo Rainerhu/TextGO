@@ -121,6 +121,20 @@ export class Manager {
     try {
       // handle long press shortcut
       if (LONG_PRESS_SHORTCUT === shortcut) {
+        // check if long press has registered rules
+        const s = shortcuts.current[LONG_PRESS_SHORTCUT];
+        if (s && !s.disabled && s.rules && s.rules.length > 0) {
+          // use registered rules (same as other shortcuts)
+          const activeRules = getRulesWithGroups(s.rules).filter((r) => !r.disabled && !r.isFolder);
+          const filteredRules = filterRulesByApp(activeRules, appId);
+          if (filteredRules.length > 0) {
+            const layout = s.toolbarLayout || 'horizontal';
+            const payload = JSON.stringify({ rules: filteredRules, selection, layout });
+            await invoke('show_toolbar', { payload, mouse: true });
+            return;
+          }
+        }
+        // fallback: show default paste toolbar
         const payload = JSON.stringify({ rules: [{ action: 'paste', shortcut }], selection });
         await invoke('show_toolbar', { payload, mouse: true });
         return;

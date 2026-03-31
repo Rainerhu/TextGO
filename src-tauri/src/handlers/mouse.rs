@@ -223,6 +223,21 @@ fn handle_mouse_release() -> Result<(), AppError> {
         return Ok(());
     }
 
+    // check for ctrl+click
+    if CTRL_PRESSED.get() {
+        debug!("Checking for ctrl+click (cursor: {})", is_valid_cursor);
+        if is_valid_cursor {
+            // emit ctrl+click event
+            emit_event("Ctrl+MouseClick", None)?;
+        }
+
+        // avoid sticky ctrl state on macOS
+        #[cfg(target_os = "macos")]
+        CTRL_PRESSED.set(false);
+
+        return Ok(());
+    }
+
     // check for double click
     let pos = mouse_pos()?;
     let now = Instant::now();

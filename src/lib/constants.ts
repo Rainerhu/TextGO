@@ -19,6 +19,11 @@ export const DBCLICK_SHORTCUT = 'MouseClick+MouseClick';
 export const SHIFT_CLICK_SHORTCUT = 'Shift+MouseClick';
 
 /**
+ * Ctrl + Mouse click shortcut.
+ */
+export const CTRL_CLICK_SHORTCUT = 'Ctrl+MouseClick';
+
+/**
  * Long press shortcut.
  */
 export const LONG_PRESS_SHORTCUT = 'LongPress';
