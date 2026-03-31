@@ -309,7 +309,10 @@
         {#snippet row(item)}
           {@const { label: caseLabel, icon: caseIcon } = ruleBinder?.getCaseOption(item.case) ?? {}}
           {@const { label: actionLabel, icon: actionIcon } = ruleBinder?.getActionOption(item.action) ?? {}}
-          <div class="list-col-grow grid grid-cols-12 items-center gap-4 pl-4">
+          <div
+            class="list-col-grow grid grid-cols-12 items-center gap-4 pl-4"
+            class:opacity-40={item.disabled}
+          >
             <div class="col-span-5 flex items-center gap-1.5" title={caseLabel}>
               {#if item.case === ''}
                 <!-- default type -->
@@ -352,6 +355,19 @@
               {/if}
             </div>
           </div>
+          {#if item.group}
+            <span class="badge badge-sm bg-base-200 text-xs opacity-60" title={item.group}>
+              {item.group}
+            </span>
+          {/if}
+          <Button
+            icon={item.disabled ? ProhibitInsetIcon : ProhibitInsetIcon}
+            iconClass={item.disabled ? 'rotate-90 text-error/60' : 'rotate-90 opacity-30'}
+            onclick={(event) => {
+              event.stopPropagation();
+              item.disabled = !item.disabled;
+            }}
+          />
           <Button
             icon={GearSixIcon}
             iconWeight="fill"

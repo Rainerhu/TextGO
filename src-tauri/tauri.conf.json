@@ -37,7 +37,7 @@
         "transparent": true,
         "skipTaskbar": true,
         "alwaysOnTop": true,
-        "resizable": false,
+        "resizable": true,
         "acceptFirstMouse": true
       },
       {

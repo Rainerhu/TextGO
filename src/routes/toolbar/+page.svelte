@@ -2,7 +2,7 @@
   import { Icon } from '$lib/components';
   import { PROMPT_MARK, SCRIPT_MARK, SEARCHER_MARK } from '$lib/constants';
   import { CONVERT_ACTIONS, DEFAULT_ACTIONS, execute, GENERAL_ACTIONS, PROCESS_ACTIONS } from '$lib/executor';
-  import { prompts, scripts, searchers } from '$lib/stores.svelte';
+  import { prompts, scripts, searchers, shortcuts as shortcutStore } from '$lib/stores.svelte';
   import type { Rule, WindowPlacement } from '$lib/types';
   import { invoke } from '@tauri-apps/api/core';
   import { LogicalPosition, LogicalSize } from '@tauri-apps/api/dpi';
@@ -13,7 +13,14 @@
   import { type } from '@tauri-apps/plugin-os';
   import { memoize } from 'es-toolkit/function';
   import type { IconComponentProps } from 'phosphor-svelte';
-  import { CodeIcon, DotsThreeVerticalIcon, LineVerticalIcon, MagnifyingGlassIcon, RobotIcon } from 'phosphor-svelte';
+  import {
+    CodeIcon,
+    DotsThreeVerticalIcon,
+    FolderIcon,
+    LineVerticalIcon,
+    MagnifyingGlassIcon,
+    RobotIcon
+  } from 'phosphor-svelte';
   import type { Component } from 'svelte';
   import { mount, onMount, tick, unmount } from 'svelte';
   import { fly } from 'svelte/transition';
@@ -52,8 +59,79 @@
 
   // matched actions to display
   let actions: Action[] = $state([]);
-  let visibleActions: Action[] = $derived(actions.slice(0, MAX_VISIBLE_ACTIONS));
-  let overflowActions: Action[] = $derived(actions.slice(MAX_VISIBLE_ACTIONS));
+
+  // folder group type for toolbar display
+  type FolderGroup = {
+    name: string;
+    icon?: Component<IconComponentProps> | string;
+    displayMode?: 'icon' | 'label' | 'both';
+    actions: Action[];
+  };
+
+  // toolbar items: either a standalone action or a folder group
+  type ToolbarItem = { type: 'action'; action: Action } | { type: 'folder'; folder: FolderGroup };
+
+  // organized toolbar items (actions + folders)
+  let toolbarItems: ToolbarItem[] = $derived.by(() => {
+    const items: ToolbarItem[] = [];
+    const groupMap = new Map<string, Action[]>();
+    const ungrouped: Action[] = [];
+
+    // separate grouped and ungrouped actions, preserving order of first appearance
+    const groupOrder: string[] = [];
+    for (const action of actions) {
+      if (action.rule.group) {
+        const groupName = action.rule.group;
+        if (!groupMap.has(groupName)) {
+          groupMap.set(groupName, []);
+          groupOrder.push(groupName);
+        }
+        groupMap.get(groupName)!.push(action);
+      } else {
+        ungrouped.push(action);
+      }
+    }
+
+    // build toolbar items in order: ungrouped first, then folders
+    for (const action of ungrouped) {
+      items.push({ type: 'action', action });
+    }
+    for (const groupName of groupOrder) {
+      const groupActions = groupMap.get(groupName)!;
+      // get group config from shortcut store
+      const shortcutKey = groupActions[0]?.rule.shortcut;
+      const groupConfig = shortcutKey ? shortcutStore.current[shortcutKey]?.groups?.[groupName] : undefined;
+      items.push({
+        type: 'folder',
+        folder: {
+          name: groupName,
+          icon: groupConfig?.icon || FolderIcon,
+          displayMode: groupConfig?.displayMode || 'both',
+          actions: groupActions
+        }
+      });
+    }
+    return items;
+  });
+
+  // visible and overflow toolbar items
+  let visibleItems: ToolbarItem[] = $derived(toolbarItems.slice(0, MAX_VISIBLE_ACTIONS));
+  let overflowItems: ToolbarItem[] = $derived(toolbarItems.slice(MAX_VISIBLE_ACTIONS));
+
+  // flatten overflow items to actions for the overflow menu
+  let overflowActions: Action[] = $derived(
+    overflowItems.flatMap((item) => (item.type === 'action' ? [item.action] : item.folder.actions))
+  );
+
+  // currently expanded folder name
+  let expandedFolder: string | null = $state(null);
+
+  // expanded folder actions
+  let expandedActions: Action[] = $derived.by(() => {
+    if (!expandedFolder) return [];
+    const item = toolbarItems.find((i) => i.type === 'folder' && i.folder.name === expandedFolder);
+    return item?.type === 'folder' ? item.folder.actions : [];
+  });
 
   // custom action types
   let actionTypes = $derived([
@@ -130,6 +208,7 @@
     // update current selection and lazy state
     selection = data.selection || '';
     isLazy = data.lazy || false;
+    expandedFolder = null;
 
     // map rules to actions
     actions = data.rules.map(mapToAction).filter((a) => !!a);
@@ -150,6 +229,13 @@
     initialized = true;
 
     // resize window to fit content after actions are updated
+    await resizeToFit();
+  }
+
+  /**
+   * Resize window to fit toolbar content.
+   */
+  async function resizeToFit() {
     await tick();
     if (container) {
       try {
@@ -405,41 +491,103 @@
 <main class="bg-transparent p-1 select-none">
   {#if initialized && actions.length > 0}
     <div class="w-fit overflow-hidden rounded-box border shadow-sm" in:fly={{ y: -10, duration: 100 }}>
-      <div class="flex h-8 w-fit bg-base-200/95 backdrop-blur-sm" bind:this={container}>
-        <span
-          class="flex cursor-grabbing items-center opacity-20 transition-opacity"
-          class:hover:opacity-90={mouseEntered}
-          data-tauri-drag-region
-        >
-          <LineVerticalIcon class="pointer-events-none size-4" />
-        </span>
-        {#each visibleActions as action (action.id)}
-          {@const showIcon = action.rule.displayMode !== 'label'}
-          {@const showLabel = action.rule.displayMode !== 'icon'}
-          <button
-            class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
-            class:hover:bg-btn-hover={mouseEntered}
-            class:hover:text-primary={mouseEntered}
-            onclick={() => executeAction(action)}
-            title={action.label}
+      <div class="flex flex-col w-fit bg-base-200/95 backdrop-blur-sm" bind:this={container}>
+        <!-- main toolbar row -->
+        <div class="flex h-8 w-fit">
+          <span
+            class="flex cursor-grabbing items-center opacity-20 transition-opacity"
+            class:hover:opacity-90={mouseEntered}
+            data-tauri-drag-region
           >
-            {#if showIcon && action.icon}
-              <Icon icon={action.icon} class="size-4.5 shrink-0" />
+            <LineVerticalIcon class="pointer-events-none size-4" />
+          </span>
+          {#each visibleItems as item (item.type === 'action' ? item.action.id : item.folder.name)}
+            {#if item.type === 'action'}
+              {@const action = item.action}
+              {@const showIcon = action.rule.displayMode !== 'label'}
+              {@const showLabel = action.rule.displayMode !== 'icon'}
+              <button
+                class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                class:hover:bg-btn-hover={mouseEntered}
+                class:hover:text-primary={mouseEntered}
+                onclick={() => executeAction(action)}
+                title={action.label}
+              >
+                {#if showIcon && action.icon}
+                  <Icon icon={action.icon} class="size-4.5 shrink-0" />
+                {/if}
+                {#if showLabel}
+                  <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
+                {/if}
+              </button>
+            {:else}
+              {@const folder = item.folder}
+              {@const showIcon = folder.displayMode !== 'label'}
+              {@const showLabel = folder.displayMode !== 'icon'}
+              <button
+                class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                class:hover:bg-btn-hover={mouseEntered}
+                class:hover:text-primary={mouseEntered}
+                class:bg-btn-hover={expandedFolder === folder.name}
+                class:text-primary={expandedFolder === folder.name}
+                onmouseenter={() => {
+                  expandedFolder = folder.name;
+                  resizeToFit();
+                }}
+                title={folder.name}
+              >
+                {#if showIcon && folder.icon}
+                  <Icon icon={folder.icon} class="size-4.5 shrink-0" />
+                {/if}
+                {#if showLabel}
+                  <span class="max-w-30 truncate text-xs font-[450]">{folder.name}</span>
+                {/if}
+              </button>
             {/if}
-            {#if showLabel}
-              <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
-            {/if}
-          </button>
-        {/each}
-        {#if overflowActions.length > 0}
-          <button
-            class="h-8 cursor-pointer opacity-60 transition-all"
-            class:hover:bg-btn-hover={mouseEntered}
-            class:hover:opacity-100={mouseEntered}
-            onclick={showMoreActions}
+          {/each}
+          {#if overflowActions.length > 0}
+            <button
+              class="h-8 cursor-pointer opacity-60 transition-all"
+              class:hover:bg-btn-hover={mouseEntered}
+              class:hover:opacity-100={mouseEntered}
+              onclick={showMoreActions}
+            >
+              <DotsThreeVerticalIcon weight="bold" class="size-5" />
+            </button>
+          {/if}
+        </div>
+        <!-- expanded folder row -->
+        {#if expandedFolder && expandedActions.length > 0}
+          <div
+            class="flex h-8 w-fit border-t border-base-300"
+            in:fly={{ y: -5, duration: 100 }}
+            onmouseleave={() => {
+              expandedFolder = null;
+              resizeToFit();
+            }}
           >
-            <DotsThreeVerticalIcon weight="bold" class="size-5" />
-          </button>
+            <span class="flex items-center px-1 opacity-30">
+              <LineVerticalIcon class="pointer-events-none size-3" />
+            </span>
+            {#each expandedActions as action (action.id)}
+              {@const showIcon = action.rule.displayMode !== 'label'}
+              {@const showLabel = action.rule.displayMode !== 'icon'}
+              <button
+                class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                class:hover:bg-btn-hover={mouseEntered}
+                class:hover:text-primary={mouseEntered}
+                onclick={() => executeAction(action)}
+                title={action.label}
+              >
+                {#if showIcon && action.icon}
+                  <Icon icon={action.icon} class="size-4.5 shrink-0" />
+                {/if}
+                {#if showLabel}
+                  <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
         {/if}
       </div>
     </div>

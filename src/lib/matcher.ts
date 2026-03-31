@@ -464,6 +464,11 @@ async function match(text: string, rules: Rule[], matchAll: boolean): Promise<Ru
 
   // iterate through all rules
   for (const rule of rules) {
+    if (rule.disabled) {
+      // skip disabled rules
+      continue;
+    }
+
     if (matchedActions.has(rule.action)) {
       // skip if action already matched
       continue;

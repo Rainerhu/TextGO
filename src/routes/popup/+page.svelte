@@ -2,9 +2,10 @@
   import { Button, CodeMirror, Icon } from '$lib/components';
   import { createLLMClient, type ChatMessage, type LLMClient } from '$lib/llm';
   import { m } from '$lib/paraglide/messages';
-  import { popupPinned, prompts } from '$lib/stores.svelte';
+  import { popupDefaultSize, popupPinned, popupRememberSize, popupSize, prompts } from '$lib/stores.svelte';
   import type { Entry } from '$lib/types';
   import { invoke } from '@tauri-apps/api/core';
+  import { LogicalSize } from '@tauri-apps/api/dpi';
   import { listen } from '@tauri-apps/api/event';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
@@ -239,6 +240,38 @@
   onMount(async () => {
     // mark popup as initialized
     await invoke('mark_popup_initialized');
+
+    // apply saved popup size
+    try {
+      const size = popupRememberSize.current ? popupSize.current : popupDefaultSize.current;
+      await currentWindow.setSize(new LogicalSize(size.width, size.height));
+    } catch (e) {
+      console.error(`Failed to set popup size: ${e}`);
+    }
+
+    // track resize events to save size
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const unlistenResize = await currentWindow.onResized(async (event) => {
+      if (!popupRememberSize.current) return;
+      // debounce to avoid excessive writes
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(async () => {
+        try {
+          const scale = await currentWindow.scaleFactor();
+          const w = event.payload.width / scale;
+          const h = event.payload.height / scale;
+          if (w > 50 && h > 50) {
+            popupSize.current = { width: Math.round(w), height: Math.round(h) };
+          }
+        } catch (e) {
+          console.error(`Failed to save popup size: ${e}`);
+        }
+      }, 300);
+    });
+
+    return () => {
+      unlistenResize();
+    };
   });
 
   onMount(() => {
@@ -304,6 +337,16 @@
         </div>
         <div class="ml-auto flex items-center gap-1">
           {#if promptMode}
+            <Button
+              icon={CopySimpleIcon}
+              iconClass="opacity-80"
+              disabled={!entry?.response || streaming}
+              onclick={() => {
+                if (entry?.response) {
+                  invoke('set_clipboard_text', { text: entry.response });
+                }
+              }}
+            />
             <Button
               icon={StopCircleIcon}
               iconWeight="bold"

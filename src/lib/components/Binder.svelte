@@ -68,6 +68,7 @@
       outputMode = rule.outputMode;
       history = rule.history || false;
       clipboard = rule.clipboard || false;
+      group = rule.group || '';
     } else {
       // load last choices from history
       const history = histories.get(shortcut);
@@ -78,6 +79,7 @@
         caseId = '';
         actionId = 'copy';
       }
+      group = '';
     }
     modal.show();
   };
@@ -97,6 +99,8 @@
   let outputMode: OutputMode | undefined = $state('replace');
   let history: boolean = $state(false);
   let clipboard: boolean = $state(false);
+  // folder group name
+  let group: string = $state('');
 
   // reset options when action changes
   $effect(() => {
@@ -274,6 +278,7 @@
           rule.outputMode = outputMode;
           rule.history = history;
           rule.clipboard = clipboard;
+          rule.group = group || undefined;
           break;
         }
       }
@@ -310,7 +315,8 @@
         preview: preview,
         outputMode: outputMode,
         history: history,
-        clipboard: clipboard
+        clipboard: clipboard,
+        group: group || undefined
       });
       // save history
       histories.set(shortcut, { caseId, actionId });
@@ -403,6 +409,19 @@
         <SlidersHorizontalIcon class="size-5" />
         {m.more_options()}
       </legend>
+      <!-- folder group -->
+      <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
+        <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_group())}">
+          {m.rule_group()}
+        </div>
+        <input
+          type="text"
+          class="input w-full input-sm"
+          placeholder={m.rule_group_placeholder()}
+          bind:value={group}
+        />
+      </div>
+      <div class="divider my-1 opacity-50"></div>
       <!-- toolbar options -->
       <div class="grid grid-cols-[6rem_1fr] items-start gap-4">
         <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.toolbar_display())}">

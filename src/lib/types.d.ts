@@ -181,6 +181,20 @@ export type Rule = {
   history?: boolean;
   /** Whether to copy execution result to clipboard. */
   clipboard?: boolean;
+  /** Whether the rule is disabled. */
+  disabled?: boolean;
+  /** Folder group name for toolbar display. */
+  group?: string;
+};
+
+/**
+ * Folder group configuration for toolbar display.
+ */
+export type RuleGroup = {
+  /** Group icon. */
+  icon?: string;
+  /** How to display the group in toolbar. */
+  displayMode?: DisplayMode;
 };
 
 /**
@@ -195,6 +209,8 @@ export type Shortcut = {
   disabled?: boolean;
   /** Whether the rules are collapsed in the UI. */
   collapsed?: boolean;
+  /** Folder group configurations. */
+  groups?: Record<string, RuleGroup>;
 };
 
 /**

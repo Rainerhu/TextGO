@@ -161,6 +161,18 @@ export const accessibility = persisted<boolean>('accessibility', false);
 // whether the popup window is pinned
 export const popupPinned = persisted<boolean>('popupPinned', false);
 
+// whether to remember popup window size
+export const popupRememberSize = persisted<boolean>('popupRememberSize', true);
+
+// popup window size (width, height)
+export const popupSize = persisted<{ width: number; height: number }>('popupSize', { width: 400, height: 300 });
+
+// default popup window size (width, height)
+export const popupDefaultSize = persisted<{ width: number; height: number }>('popupDefaultSize', {
+  width: 400,
+  height: 300
+});
+
 // number of history records to retain
 export const historySize = persisted<number>('historySize', 5);
 

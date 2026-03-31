@@ -3,11 +3,12 @@
   import { setupTray } from '$lib/helpers';
   import { m } from '$lib/paraglide/messages';
   import { getLocale, setLocale, type Locale } from '$lib/paraglide/runtime';
-  import { accessibility, autoStart, autoUpdate, historySize, minimizeToTray, theme } from '$lib/stores.svelte';
+  import { accessibility, autoStart, autoUpdate, historySize, minimizeToTray, popupDefaultSize, popupRememberSize, theme } from '$lib/stores.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
   import { type } from '@tauri-apps/plugin-os';
   import {
+    AppWindowIcon,
     CheckCircleIcon,
     ClockCounterClockwiseIcon,
     MonitorIcon,
@@ -99,6 +100,36 @@
         ]}
         bind:value={historySize.current}
         class="w-36 select-sm"
+      />
+    </fieldset>
+  </Setting>
+  <Setting icon={AppWindowIcon} title={m.popup_settings()}>
+    <fieldset class="flex items-center justify-between gap-1">
+      <Label tip={m.popup_remember_size_explain()} tipPlacement="duplex">{m.popup_remember_size()}</Label>
+      <Toggle bind:value={popupRememberSize.current} />
+    </fieldset>
+    <div class="divider my-0 opacity-60"></div>
+    <fieldset class="flex items-center justify-between gap-1">
+      <Label>{m.popup_default_width()}</Label>
+      <input
+        type="number"
+        class="input w-24 input-sm"
+        min="200"
+        max="1200"
+        step="50"
+        bind:value={popupDefaultSize.current.width}
+      />
+    </fieldset>
+    <div class="divider my-0 opacity-60"></div>
+    <fieldset class="flex items-center justify-between gap-1">
+      <Label>{m.popup_default_height()}</Label>
+      <input
+        type="number"
+        class="input w-24 input-sm"
+        min="150"
+        max="900"
+        step="50"
+        bind:value={popupDefaultSize.current.height}
       />
     </fieldset>
   </Setting>
