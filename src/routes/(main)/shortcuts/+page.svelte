@@ -13,12 +13,14 @@
     ArrowFatUpIcon,
     ArrowsClockwiseIcon,
     BrowserIcon,
+    ColumnsIcon,
     CursorClickIcon,
     GearSixIcon,
     KeyboardIcon,
     MouseLeftClickIcon,
     ProhibitIcon,
     ProhibitInsetIcon,
+    RowsIcon,
     SparkleIcon,
     StackPlusIcon,
     TrashIcon,
@@ -257,6 +259,24 @@
             {/if}
           </span>
         </button>
+        {#if mode === 'toolbar'}
+          {@const layout = shortcuts.current[shortcut].toolbarLayout || 'horizontal'}
+          <button
+            class="group ml-1 badge cursor-pointer bg-base-200 opacity-60 transition-all hover:opacity-100"
+            onclick={() => {
+              const s = shortcuts.current[shortcut];
+              s.toolbarLayout = (s.toolbarLayout || 'horizontal') === 'horizontal' ? 'vertical' : 'horizontal';
+            }}
+            title={layout === 'horizontal' ? m.toolbar_vertical() : m.toolbar_horizontal()}
+          >
+            {#if layout === 'horizontal'}
+              <RowsIcon class="size-3.5" />
+            {:else}
+              <ColumnsIcon class="size-3.5" />
+            {/if}
+            <span class="text-xs">{layout === 'horizontal' ? m.toolbar_horizontal() : m.toolbar_vertical()}</span>
+          </button>
+        {/if}
         <Button
           icon={disabled ? ArrowClockwiseIcon : ProhibitInsetIcon}
           size="sm"

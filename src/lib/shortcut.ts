@@ -9,6 +9,35 @@ import { LONG_PRESS_SHORTCUT } from './constants';
 import { isMouseShortcut } from './helpers';
 
 /**
+ * Simple wildcard match (case-insensitive, supports * and ?).
+ */
+function wildcardMatch(pattern: string, input: string): boolean {
+  const regex = new RegExp(
+    '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
+    'i'
+  );
+  return regex.test(input);
+}
+
+/**
+ * Filter rules based on the current app ID.
+ * Rules with showOnlyApps are only shown if the app matches.
+ * Rules with noShowApps are hidden if the app matches.
+ */
+function filterRulesByApp(rules: Rule[], appId?: string): Rule[] {
+  if (!appId) return rules;
+  return rules.filter((rule) => {
+    if (rule.showOnlyApps && rule.showOnlyApps.length > 0) {
+      return rule.showOnlyApps.some((pattern) => wildcardMatch(pattern, appId));
+    }
+    if (rule.noShowApps && rule.noShowApps.length > 0) {
+      return !rule.noShowApps.some((pattern) => wildcardMatch(pattern, appId));
+    }
+    return true;
+  });
+}
+
+/**
  * Update case ID in rules with given prefix.
  *
  * @param prefix - case ID prefix
@@ -64,8 +93,8 @@ export class Manager {
       try {
         // listen for shortcut triggered events from Rust backend
         await listen('shortcut', async (event) => {
-          const payload = event.payload as { shortcut: string; selection: string };
-          await this.handleShortcutEvent(payload.shortcut, payload.selection);
+          const payload = event.payload as { shortcut: string; selection: string; appId?: string };
+          await this.handleShortcutEvent(payload.shortcut, payload.selection, payload.appId);
         });
       } catch (error) {
         console.error(`Failed to initialize shortcut event listener: ${error}`);
@@ -78,8 +107,9 @@ export class Manager {
    *
    * @param shortcut - triggered shortcut string
    * @param selection - selected text
+   * @param appId - frontmost application identifier
    */
-  private async handleShortcutEvent(shortcut: string, selection: string): Promise<void> {
+  private async handleShortcutEvent(shortcut: string, selection: string, appId?: string): Promise<void> {
     try {
       // handle long press shortcut
       if (LONG_PRESS_SHORTCUT === shortcut) {
@@ -94,6 +124,12 @@ export class Manager {
         return;
       }
 
+      // filter rules by current app
+      const appFilteredRules = filterRulesByApp(s.rules, appId);
+      if (appFilteredRules.length === 0) {
+        return;
+      }
+
       // check if this is a lazy selection event (mouse shortcut with empty selection)
       const isLazy = lazySelection.current && isMouseShortcut(shortcut) && !selection;
 
@@ -101,17 +137,18 @@ export class Manager {
         let rules: Rule[];
         if (isLazy) {
           // in lazy mode, show all rules without matching (selection will be fetched on action click)
-          rules = s.rules;
+          rules = appFilteredRules;
         } else {
           // find all matching rules
-          rules = await matchAll(selection, s.rules);
+          rules = await matchAll(selection, appFilteredRules);
         }
         if (rules.length === 0) {
           console.warn('No matching rules found');
           return;
         }
         // show toolbar window
-        const payload = JSON.stringify({ rules, selection, lazy: isLazy });
+        const layout = s.toolbarLayout || 'horizontal';
+        const payload = JSON.stringify({ rules, selection, lazy: isLazy, layout });
         const mouse = isMouseShortcut(shortcut);
         if (mouse) {
           await invoke('show_toolbar', { payload, mouse });
@@ -131,7 +168,7 @@ export class Manager {
           }
         }
         // find first matching rule
-        const rule = await matchOne(selection, s.rules);
+        const rule = await matchOne(selection, appFilteredRules);
         if (rule === null) {
           console.warn('No matching rule found');
           return;

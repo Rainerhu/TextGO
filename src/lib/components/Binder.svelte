@@ -69,6 +69,8 @@
       history = rule.history || false;
       clipboard = rule.clipboard || false;
       group = rule.group || '';
+      showOnlyApps = rule.showOnlyApps?.join(', ') || '';
+      noShowApps = rule.noShowApps?.join(', ') || '';
     } else {
       // load last choices from history
       const history = histories.get(shortcut);
@@ -80,6 +82,8 @@
         actionId = 'copy';
       }
       group = '';
+      showOnlyApps = '';
+      noShowApps = '';
     }
     modal.show();
   };
@@ -101,6 +105,9 @@
   let clipboard: boolean = $state(false);
   // folder group name
   let group: string = $state('');
+  // app filter fields (comma-separated app identifiers)
+  let showOnlyApps: string = $state('');
+  let noShowApps: string = $state('');
 
   // reset options when action changes
   $effect(() => {
@@ -279,6 +286,8 @@
           rule.history = history;
           rule.clipboard = clipboard;
           rule.group = group || undefined;
+          rule.showOnlyApps = showOnlyApps ? showOnlyApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+          rule.noShowApps = noShowApps ? noShowApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
           break;
         }
       }
@@ -316,7 +325,9 @@
         outputMode: outputMode,
         history: history,
         clipboard: clipboard,
-        group: group || undefined
+        group: group || undefined,
+        showOnlyApps: showOnlyApps ? showOnlyApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+        noShowApps: noShowApps ? noShowApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined
       });
       // save history
       histories.set(shortcut, { caseId, actionId });
@@ -419,6 +430,29 @@
           class="input w-full input-sm"
           placeholder={m.rule_group_placeholder()}
           bind:value={group}
+        />
+      </div>
+      <!-- app filter -->
+      <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
+        <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_show_only_apps())}">
+          {m.rule_show_only_apps()}
+        </div>
+        <input
+          type="text"
+          class="input w-full input-sm"
+          placeholder={m.rule_app_filter_placeholder()}
+          bind:value={showOnlyApps}
+        />
+      </div>
+      <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
+        <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_no_show_apps())}">
+          {m.rule_no_show_apps()}
+        </div>
+        <input
+          type="text"
+          class="input w-full input-sm"
+          placeholder={m.rule_app_filter_placeholder()}
+          bind:value={noShowApps}
         />
       </div>
       <div class="divider my-1 opacity-50"></div>

@@ -71,6 +71,11 @@ type Processor = ActOption & {
 export type ExecutionMode = 'quiet' | 'toolbar';
 
 /**
+ * Toolbar layout direction.
+ */
+export type ToolbarLayout = 'horizontal' | 'vertical';
+
+/**
  * Output mode for execution result.
  */
 export type OutputMode = 'replace' | 'popup';
@@ -185,6 +190,10 @@ export type Rule = {
   disabled?: boolean;
   /** Folder group name for toolbar display. */
   group?: string;
+  /** Only show this rule in these apps (app identifiers, wildcard supported). */
+  showOnlyApps?: string[];
+  /** Hide this rule in these apps (app identifiers, wildcard supported). */
+  noShowApps?: string[];
 };
 
 /**
@@ -203,6 +212,8 @@ export type RuleGroup = {
 export type Shortcut = {
   /** Execution mode. */
   mode: ExecutionMode;
+  /** Toolbar layout direction. */
+  toolbarLayout?: ToolbarLayout;
   /** List of rules. */
   rules: Rule[];
   /** Whether the shortcut is disabled. */

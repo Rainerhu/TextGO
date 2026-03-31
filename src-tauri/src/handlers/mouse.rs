@@ -288,9 +288,11 @@ fn emit_event(shortcut: &str, skip_selection: Option<bool>) -> Result<(), AppErr
             || LAZY_SELECTION.load(std::sync::atomic::Ordering::Relaxed);
 
         if should_skip {
+            let app_id = platform::get_frontmost_app_id().unwrap_or_default();
             let event_data = serde_json::json!({
                 "shortcut": shortcut,
-                "selection": ""
+                "selection": "",
+                "appId": app_id
             });
             let _ = app.emit("shortcut", event_data);
             return Ok(());
@@ -302,10 +304,12 @@ fn emit_event(shortcut: &str, skip_selection: Option<bool>) -> Result<(), AppErr
         tauri::async_runtime::spawn(async move {
             if let Ok(selection) = get_selection(app_handle.clone(), Some(true)).await {
                 if !selection.trim().is_empty() {
+                    let app_id = platform::get_frontmost_app_id().unwrap_or_default();
                     // emit event if selection is not empty
                     let event_data = serde_json::json!({
                         "shortcut": shortcut,
-                        "selection": selection
+                        "selection": selection,
+                        "appId": app_id
                     });
                     let _ = app_handle.emit("shortcut", event_data);
                 }

@@ -46,6 +46,9 @@
   // whether this is a lazy selection event (selection deferred until action click)
   let isLazy: boolean = $state(false);
 
+  // toolbar layout direction
+  let layout: 'horizontal' | 'vertical' = $state('horizontal');
+
   // track if mouse is inside toolbar
   let mouseEntered = $state(true);
 
@@ -200,7 +203,7 @@
    *
    * @param data - toolbar setup data
    */
-  async function setup(data: { rules: Rule[]; selection: string; lazy?: boolean }) {
+  async function setup(data: { rules: Rule[]; selection: string; lazy?: boolean; layout?: string }) {
     if (!data || !data.rules || !Array.isArray(data.rules)) {
       return;
     }
@@ -208,6 +211,7 @@
     // update current selection and lazy state
     selection = data.selection || '';
     isLazy = data.lazy || false;
+    layout = (data.layout as 'horizontal' | 'vertical') || 'horizontal';
     expandedFolder = null;
 
     // map rules to actions
@@ -491,15 +495,19 @@
 <main class="bg-transparent p-1 select-none">
   {#if initialized && actions.length > 0}
     <div class="w-fit overflow-hidden rounded-box border shadow-sm" in:fly={{ y: -10, duration: 100 }}>
-      <div class="flex flex-col w-fit bg-base-200/95 backdrop-blur-sm" bind:this={container}>
-        <!-- main toolbar row -->
-        <div class="flex h-8 w-fit">
+      <div
+        class="flex w-fit bg-base-200/95 backdrop-blur-sm"
+        class:flex-col={layout === 'horizontal'}
+        bind:this={container}
+      >
+        <!-- main toolbar row/column -->
+        <div class="flex w-fit" class:flex-col={layout === 'vertical'}>
           <span
             class="flex cursor-grabbing items-center opacity-20 transition-opacity"
             class:hover:opacity-90={mouseEntered}
             data-tauri-drag-region
           >
-            <LineVerticalIcon class="pointer-events-none size-4" />
+            <LineVerticalIcon class="pointer-events-none size-4" class:rotate-90={layout === 'vertical'} />
           </span>
           {#each visibleItems as item (item.type === 'action' ? item.action.id : item.folder.name)}
             {#if item.type === 'action'}
@@ -507,7 +515,7 @@
               {@const showIcon = action.rule.displayMode !== 'label'}
               {@const showLabel = action.rule.displayMode !== 'icon'}
               <button
-                class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
                 class:hover:bg-btn-hover={mouseEntered}
                 class:hover:text-primary={mouseEntered}
                 onclick={() => executeAction(action)}
@@ -525,7 +533,7 @@
               {@const showIcon = folder.displayMode !== 'label'}
               {@const showLabel = folder.displayMode !== 'icon'}
               <button
-                class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
                 class:hover:bg-btn-hover={mouseEntered}
                 class:hover:text-primary={mouseEntered}
                 class:bg-btn-hover={expandedFolder === folder.name}
@@ -547,33 +555,37 @@
           {/each}
           {#if overflowActions.length > 0}
             <button
-              class="h-8 cursor-pointer opacity-60 transition-all"
+              class="flex h-8 cursor-pointer items-center opacity-60 transition-all"
               class:hover:bg-btn-hover={mouseEntered}
               class:hover:opacity-100={mouseEntered}
               onclick={showMoreActions}
             >
-              <DotsThreeVerticalIcon weight="bold" class="size-5" />
+              <DotsThreeVerticalIcon weight="bold" class="size-5" class:rotate-90={layout === 'vertical'} />
             </button>
           {/if}
         </div>
         <!-- expanded folder row -->
         {#if expandedFolder && expandedActions.length > 0}
           <div
-            class="flex h-8 w-fit border-t border-base-300"
-            in:fly={{ y: -5, duration: 100 }}
+            class="flex w-fit"
+            class:flex-col={layout === 'vertical'}
+            class:border-t={layout === 'horizontal'}
+            class:border-l={layout === 'vertical'}
+            class:border-base-300={true}
+            in:fly={{ y: layout === 'horizontal' ? -5 : 0, x: layout === 'vertical' ? -5 : 0, duration: 100 }}
             onmouseleave={() => {
               expandedFolder = null;
               resizeToFit();
             }}
           >
             <span class="flex items-center px-1 opacity-30">
-              <LineVerticalIcon class="pointer-events-none size-3" />
+              <LineVerticalIcon class="pointer-events-none size-3" class:rotate-90={layout === 'vertical'} />
             </span>
             {#each expandedActions as action (action.id)}
               {@const showIcon = action.rule.displayMode !== 'label'}
               {@const showLabel = action.rule.displayMode !== 'icon'}
               <button
-                class="flex cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
                 class:hover:bg-btn-hover={mouseEntered}
                 class:hover:text-primary={mouseEntered}
                 onclick={() => executeAction(action)}
