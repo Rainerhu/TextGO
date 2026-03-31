@@ -124,8 +124,8 @@ export class Manager {
         return;
       }
 
-      // filter rules by current app
-      const appFilteredRules = filterRulesByApp(s.rules, appId);
+      // filter rules by current app and remove disabled rules
+      const appFilteredRules = filterRulesByApp(s.rules, appId).filter((r) => !r.disabled);
       if (appFilteredRules.length === 0) {
         return;
       }

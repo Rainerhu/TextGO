@@ -64,6 +64,8 @@
   "rule_updated_success": "规则更新成功！",
   "rule_group": "文件夹",
   "rule_group_placeholder": "留空则不分组",
+  "rule_group_icon": "文件夹图标",
+  "rule_group_icon_placeholder": "Phosphor 图标名称，如 Folder",
   "rule_show_only_apps": "仅在应用",
   "rule_no_show_apps": "排除应用",
   "rule_app_filter_placeholder": "应用标识，逗号分隔",

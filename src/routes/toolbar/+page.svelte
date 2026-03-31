@@ -507,7 +507,7 @@
             class:hover:opacity-90={mouseEntered}
             data-tauri-drag-region
           >
-            <LineVerticalIcon class="pointer-events-none size-4" class:rotate-90={layout === 'vertical'} />
+            <LineVerticalIcon class="pointer-events-none size-4 {layout === 'vertical' ? 'rotate-90' : ''}" />
           </span>
           {#each visibleItems as item (item.type === 'action' ? item.action.id : item.folder.name)}
             {#if item.type === 'action'}
@@ -560,7 +560,7 @@
               class:hover:opacity-100={mouseEntered}
               onclick={showMoreActions}
             >
-              <DotsThreeVerticalIcon weight="bold" class="size-5" class:rotate-90={layout === 'vertical'} />
+              <DotsThreeVerticalIcon weight="bold" class="size-5 {layout === 'vertical' ? 'rotate-90' : ''}" />
             </button>
           {/if}
         </div>
@@ -579,7 +579,7 @@
             }}
           >
             <span class="flex items-center px-1 opacity-30">
-              <LineVerticalIcon class="pointer-events-none size-3" class:rotate-90={layout === 'vertical'} />
+              <LineVerticalIcon class="pointer-events-none size-3 {layout === 'vertical' ? 'rotate-90' : ''}" />
             </span>
             {#each expandedActions as action (action.id)}
               {@const showIcon = action.rule.displayMode !== 'label'}
