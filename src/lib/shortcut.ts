@@ -20,18 +20,11 @@ function wildcardMatch(pattern: string, input: string): boolean {
 }
 
 /**
- * Compute group membership for rules based on folder marker positions.
- * Rules after a folder marker belong to that folder until the next folder marker.
+ * Compute group membership: rules use their own group field directly.
+ * Folder markers are filtered out, rules keep their explicit group assignment.
  */
-function assignGroupsFromPosition(rules: Rule[]): Rule[] {
-  let currentGroup: string | undefined;
-  return rules.map((rule) => {
-    if (rule.isFolder) {
-      currentGroup = rule.id;
-      return rule;
-    }
-    return { ...rule, group: currentGroup };
-  });
+function getRulesWithGroups(rules: Rule[]): Rule[] {
+  return rules.filter((r) => !r.isFolder);
 }
 
 /**
@@ -139,9 +132,9 @@ export class Manager {
         return;
       }
 
-      // assign group membership based on folder marker positions, then filter
-      const rulesWithGroups = assignGroupsFromPosition(s.rules);
-      const appFilteredRules = filterRulesByApp(rulesWithGroups, appId).filter((r) => !r.disabled && !r.isFolder);
+      // get rules with explicit group assignments, filter out folder markers and disabled
+      const activeRules = getRulesWithGroups(s.rules).filter((r) => !r.disabled);
+      const appFilteredRules = filterRulesByApp(activeRules, appId);
       if (appFilteredRules.length === 0) {
         return;
       }

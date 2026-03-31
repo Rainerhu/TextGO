@@ -68,6 +68,7 @@
       outputMode = rule.outputMode;
       history = rule.history || false;
       clipboard = rule.clipboard || false;
+      group = rule.group || '';
       showOnlyApps = rule.showOnlyApps?.join(', ') || '';
       noShowApps = rule.noShowApps?.join(', ') || '';
     } else {
@@ -80,6 +81,7 @@
         caseId = '';
         actionId = 'copy';
       }
+      group = '';
       showOnlyApps = '';
       noShowApps = '';
     }
@@ -101,6 +103,19 @@
   let outputMode: OutputMode | undefined = $state('replace');
   let history: boolean = $state(false);
   let clipboard: boolean = $state(false);
+  // folder group name (references a folder in Shortcut.groups)
+  let group: string = $state('');
+  // available folder groups for current shortcut
+  let groupOptions = $derived.by(() => {
+    const options: { value: string; label: string }[] = [{ value: '', label: m.rule_group_none() }];
+    const groups = shortcuts.current[shortcut]?.groups;
+    if (groups) {
+      for (const name of Object.keys(groups)) {
+        options.push({ value: name, label: name });
+      }
+    }
+    return options;
+  });
   // app filter fields (comma-separated app identifiers)
   let showOnlyApps: string = $state('');
   let noShowApps: string = $state('');
@@ -281,6 +296,7 @@
           rule.outputMode = outputMode;
           rule.history = history;
           rule.clipboard = clipboard;
+          rule.group = group || undefined;
           rule.showOnlyApps = showOnlyApps ? showOnlyApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
           rule.noShowApps = noShowApps ? noShowApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
           break;
@@ -320,6 +336,7 @@
         outputMode: outputMode,
         history: history,
         clipboard: clipboard,
+        group: group || undefined,
         showOnlyApps: showOnlyApps ? showOnlyApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
         noShowApps: noShowApps ? noShowApps.split(',').map((s) => s.trim()).filter(Boolean) : undefined
       });
@@ -414,6 +431,17 @@
         <SlidersHorizontalIcon class="size-5" />
         {m.more_options()}
       </legend>
+      <!-- folder group -->
+      <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
+        <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_group())}">
+          {m.rule_group()}
+        </div>
+        <Select
+          bind:value={group}
+          options={groupOptions}
+          class="select-sm"
+        />
+      </div>
       <!-- app filter -->
       <div class="grid grid-cols-[6rem_1fr] items-center gap-4">
         <div class="flex h-7 items-center opacity-90" style="font-size:{dynamicFontSize(m.rule_show_only_apps())}">
