@@ -142,13 +142,48 @@
   let expandedFolder: string | null = $state(null);
   let folderCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // folder button elements for position calculation
+  let folderButtonRefs: Record<string, HTMLButtonElement> = $state({});
+  let popupRef: HTMLDivElement | null = $state(null);
+
+  // computed left offset to center popup under the folder button (horizontal layout only)
+  let popupOffsetLeft: number = $derived.by(() => {
+    if (layout !== 'horizontal' || !expandedFolder || !container) return 0;
+    const btn = folderButtonRefs[expandedFolder];
+    if (!btn) return 0;
+    // button center relative to container left
+    const containerRect = container.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    return btnRect.left - containerRect.left + btnRect.width / 2;
+  });
+
+  // actual margin-left for popup panel, adjusted after popup renders to avoid negative offset
+  let popupMarginLeft: number = $state(0);
+
+  async function updatePopupPosition() {
+    await tick();
+    if (layout !== 'horizontal' || !popupRef || !container) {
+      popupMarginLeft = 0;
+      return;
+    }
+    // get the inner panel width
+    const panel = popupRef.querySelector('.folder-popup-inner');
+    if (!panel) {
+      popupMarginLeft = 0;
+      return;
+    }
+    const panelWidth = panel.getBoundingClientRect().width;
+    // center the panel under the button, but clamp so it doesn't go negative
+    popupMarginLeft = Math.max(0, popupOffsetLeft - panelWidth / 2);
+  }
+
   function openFolder(name: string) {
     if (folderCloseTimer) {
       clearTimeout(folderCloseTimer);
       folderCloseTimer = null;
     }
     expandedFolder = name;
-    resizeToFit();
+    updatePopupPosition().then(() => resizeToFit());
   }
 
   function scheduleCloseFolder() {
@@ -589,6 +624,7 @@
               class:hover:text-primary={mouseEntered}
               class:bg-btn-hover={expandedFolder === folder.name}
               class:text-primary={expandedFolder === folder.name}
+              bind:this={folderButtonRefs[folder.name]}
               onmouseenter={() => openFolder(folder.name)}
               onmouseleave={scheduleCloseFolder}
               title={folder.name}
@@ -616,25 +652,51 @@
       <!-- expanded folder popup panel -->
       {#if expandedFolder && expandedActions.length > 0}
         <div
-          class="flex pt-1.5"
-          class:justify-center={layout === 'horizontal'}
-          class:pl-1.5={layout === 'vertical'}
-          class:flex-col={layout === 'vertical'}
-          in:fly={{ y: layout === 'horizontal' ? -5 : 0, x: layout === 'vertical' ? -5 : 0, duration: 100 }}
+          class="flex flex-col pt-1.5"
+          class:hidden={layout === 'vertical'}
+          in:fly={{ y: -5, duration: 100 }}
+          onmouseenter={() => cancelCloseFolder()}
+          onmouseleave={() => scheduleCloseFolder()}
+          bind:this={popupRef}
+        >
+          <!-- connector arrow + panel, centered under folder button -->
+          <div class="flex flex-col items-start" style:margin-left="{popupMarginLeft}px">
+            <div class="folder-arrow-up" style:margin-left="{Math.max(0, popupOffsetLeft - popupMarginLeft - 5)}px"></div>
+            <div
+              class="folder-popup-inner flex overflow-hidden rounded-box border bg-base-100/95 shadow-md backdrop-blur-sm"
+            >
+              {#each expandedActions as action (action.id)}
+                {@const showIcon = action.rule.displayMode !== 'label'}
+                {@const showLabel = action.rule.displayMode !== 'icon'}
+                <button
+                  class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+                  class:hover:bg-btn-hover={mouseEntered}
+                  class:hover:text-primary={mouseEntered}
+                  onclick={() => executeAction(action)}
+                  title={action.label}
+                >
+                  {#if showIcon && action.icon}
+                    <Icon icon={action.icon} class="size-4.5 shrink-0" />
+                  {/if}
+                  {#if showLabel}
+                    <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+          </div>
+        </div>
+        <!-- vertical layout: popup to the right -->
+        <div
+          class="flex items-start pl-1.5"
+          class:hidden={layout !== 'vertical'}
+          in:fly={{ x: -5, duration: 100 }}
           onmouseenter={() => cancelCloseFolder()}
           onmouseleave={() => scheduleCloseFolder()}
         >
-          <!-- connector arrow -->
-          <div class="flex justify-center" class:hidden={layout === 'vertical'}>
-            <div class="folder-arrow-up"></div>
-          </div>
-          <div class="flex items-start" class:hidden={layout !== 'vertical'}>
-            <div class="folder-arrow-left"></div>
-          </div>
-          <!-- popup panel -->
+          <div class="folder-arrow-left"></div>
           <div
-            class="flex overflow-hidden rounded-box border bg-base-100/95 shadow-md backdrop-blur-sm"
-            class:flex-col={layout === 'vertical'}
+            class="flex flex-col overflow-hidden rounded-box border bg-base-100/95 shadow-md backdrop-blur-sm"
           >
             {#each expandedActions as action (action.id)}
               {@const showIcon = action.rule.displayMode !== 'label'}
