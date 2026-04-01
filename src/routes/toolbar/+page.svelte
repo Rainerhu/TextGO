@@ -575,12 +575,8 @@
                 class:hover:text-primary={mouseEntered}
                 class:bg-btn-hover={expandedFolder === folder.name}
                 class:text-primary={expandedFolder === folder.name}
-                onmouseenter={() => {
-                  openFolder(folder.name);
-                }}
-                onmouseleave={() => {
-                  scheduleCloseFolder();
-                }}}
+                onmouseenter={() => openFolder(folder.name)}
+                onmouseleave={scheduleCloseFolder}
                 title={folder.name}
               >
                 {#if showIcon && folder.icon}
