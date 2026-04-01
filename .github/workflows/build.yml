@@ -8,12 +8,6 @@ on:
       - '*.md'
       - 'screenshots/**'
   workflow_dispatch:
-    inputs:
-      release:
-        description: 'Publish to GitHub Release'
-        required: false
-        default: false
-        type: boolean
 
 jobs:
   build-tauri:
@@ -44,7 +38,6 @@ jobs:
         run: |
           VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "App version: $VERSION"
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -107,44 +100,3 @@ jobs:
             src-tauri/target/*/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
-
-  release:
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.release == 'true'
-    needs: build-tauri
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: read version
-        id: version
-        run: |
-          VERSION=$(grep '"version"' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: collect release files
-        run: |
-          mkdir -p release-files
-          find artifacts -type f \( -name '*.exe' -o -name '*.dmg' \) -exec cp {} release-files/ \;
-          ls -la release-files/
-
-      - name: create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: v${{ steps.version.outputs.version }}
-          body: |
-            **Downloads:**
-            - Windows x64: `.exe` installer
-            - macOS ARM64 (M1+): `.dmg`
-            - macOS x64 (Intel): `.dmg`
-          draft: false
-          prerelease: false
-          files: release-files/*
