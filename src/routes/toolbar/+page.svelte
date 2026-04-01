@@ -539,7 +539,8 @@
 <main class="bg-transparent p-1 select-none">
   {#if initialized && actions.length > 0}
     <div
-      class="w-fit overflow-hidden rounded-box border shadow-sm"
+      bind:this={container}
+      class="w-fit"
       in:fly={{ y: -10, duration: 100 }}
       onmouseleave={() => {
         if (expandedFolder) {
@@ -547,24 +548,95 @@
         }
       }}
     >
+      <!-- main toolbar -->
       <div
-        class="flex bg-base-200/95 backdrop-blur-sm"
-        class:flex-col={layout === 'horizontal'}
-        class:flex-row={layout === 'vertical'}
-        bind:this={container}
+        class="flex overflow-hidden rounded-box border bg-base-200/95 shadow-sm backdrop-blur-sm"
+        class:flex-col={layout === 'vertical'}
       >
-        <!-- main toolbar row/column -->
-        <div class="flex" class:flex-col={layout === 'vertical'}>
-          <span
-            class="flex cursor-grabbing items-center opacity-20 transition-opacity"
-            class:hover:opacity-90={mouseEntered}
-            data-tauri-drag-region
+        <span
+          class="flex cursor-grabbing items-center opacity-20 transition-opacity"
+          class:hover:opacity-90={mouseEntered}
+          data-tauri-drag-region
+        >
+          <LineVerticalIcon class="pointer-events-none size-4 {layout === 'vertical' ? 'rotate-90' : ''}" />
+        </span>
+        {#each visibleItems as item (item.type === 'action' ? item.action.id : item.folder.name)}
+          {#if item.type === 'action'}
+            {@const action = item.action}
+            {@const showIcon = action.rule.displayMode !== 'label'}
+            {@const showLabel = action.rule.displayMode !== 'icon'}
+            <button
+              class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+              class:hover:bg-btn-hover={mouseEntered}
+              class:hover:text-primary={mouseEntered}
+              onclick={() => executeAction(action)}
+              title={action.label}
+            >
+              {#if showIcon && action.icon}
+                <Icon icon={action.icon} class="size-4.5 shrink-0" />
+              {/if}
+              {#if showLabel}
+                <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
+              {/if}
+            </button>
+          {:else}
+            {@const folder = item.folder}
+            {@const showIcon = folder.displayMode !== 'label'}
+            {@const showLabel = folder.displayMode !== 'icon'}
+            <button
+              class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
+              class:hover:bg-btn-hover={mouseEntered}
+              class:hover:text-primary={mouseEntered}
+              class:bg-btn-hover={expandedFolder === folder.name}
+              class:text-primary={expandedFolder === folder.name}
+              onmouseenter={() => openFolder(folder.name)}
+              onmouseleave={scheduleCloseFolder}
+              title={folder.name}
+            >
+              {#if showIcon && folder.icon}
+                <Icon icon={folder.icon} class="size-4.5 shrink-0" />
+              {/if}
+              {#if showLabel}
+                <span class="max-w-30 truncate text-xs font-[450]">{folder.name}</span>
+              {/if}
+            </button>
+          {/if}
+        {/each}
+        {#if overflowActions.length > 0}
+          <button
+            class="flex h-8 cursor-pointer items-center opacity-60 transition-all"
+            class:hover:bg-btn-hover={mouseEntered}
+            class:hover:opacity-100={mouseEntered}
+            onclick={showMoreActions}
           >
-            <LineVerticalIcon class="pointer-events-none size-4 {layout === 'vertical' ? 'rotate-90' : ''}" />
-          </span>
-          {#each visibleItems as item (item.type === 'action' ? item.action.id : item.folder.name)}
-            {#if item.type === 'action'}
-              {@const action = item.action}
+            <DotsThreeVerticalIcon weight="bold" class="size-5 {layout === 'vertical' ? 'rotate-90' : ''}" />
+          </button>
+        {/if}
+      </div>
+      <!-- expanded folder popup panel -->
+      {#if expandedFolder && expandedActions.length > 0}
+        <div
+          class="flex pt-1.5"
+          class:justify-center={layout === 'horizontal'}
+          class:pl-1.5={layout === 'vertical'}
+          class:flex-col={layout === 'vertical'}
+          in:fly={{ y: layout === 'horizontal' ? -5 : 0, x: layout === 'vertical' ? -5 : 0, duration: 100 }}
+          onmouseenter={() => cancelCloseFolder()}
+          onmouseleave={() => scheduleCloseFolder()}
+        >
+          <!-- connector arrow -->
+          <div class="flex justify-center" class:hidden={layout === 'vertical'}>
+            <div class="folder-arrow-up"></div>
+          </div>
+          <div class="flex items-start" class:hidden={layout !== 'vertical'}>
+            <div class="folder-arrow-left"></div>
+          </div>
+          <!-- popup panel -->
+          <div
+            class="flex overflow-hidden rounded-box border bg-base-100/95 shadow-md backdrop-blur-sm"
+            class:flex-col={layout === 'vertical'}
+          >
+            {#each expandedActions as action (action.id)}
               {@const showIcon = action.rule.displayMode !== 'label'}
               {@const showLabel = action.rule.displayMode !== 'icon'}
               <button
@@ -581,74 +653,10 @@
                   <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
                 {/if}
               </button>
-            {:else}
-              {@const folder = item.folder}
-              {@const showIcon = folder.displayMode !== 'label'}
-              {@const showLabel = folder.displayMode !== 'icon'}
-              <button
-                class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
-                class:hover:bg-btn-hover={mouseEntered}
-                class:hover:text-primary={mouseEntered}
-                class:bg-btn-hover={expandedFolder === folder.name}
-                class:text-primary={expandedFolder === folder.name}
-                onmouseenter={() => openFolder(folder.name)}
-                onmouseleave={scheduleCloseFolder}
-                title={folder.name}
-              >
-                {#if showIcon && folder.icon}
-                  <Icon icon={folder.icon} class="size-4.5 shrink-0" />
-                {/if}
-                {#if showLabel}
-                  <span class="max-w-30 truncate text-xs font-[450]">{folder.name}</span>
-                {/if}
-              </button>
-            {/if}
-          {/each}
-          {#if overflowActions.length > 0}
-            <button
-              class="flex h-8 cursor-pointer items-center opacity-60 transition-all"
-              class:hover:bg-btn-hover={mouseEntered}
-              class:hover:opacity-100={mouseEntered}
-              onclick={showMoreActions}
-            >
-              <DotsThreeVerticalIcon weight="bold" class="size-5 {layout === 'vertical' ? 'rotate-90' : ''}" />
-            </button>
-          {/if}
-        </div>
-        <!-- expanded folder actions (compact, centered) -->
-        {#if expandedFolder && expandedActions.length > 0}
-          <div
-            class="flex items-center justify-center"
-            class:border-t={layout === 'horizontal'}
-            class:border-l={layout === 'vertical'}
-            class:border-base-300={true}
-            in:fly={{ y: layout === 'horizontal' ? -5 : 0, x: layout === 'vertical' ? -5 : 0, duration: 100 }}
-            onmouseenter={() => cancelCloseFolder()}
-            onmouseleave={() => scheduleCloseFolder()}
-          >
-            <div class="flex" class:flex-col={layout === 'vertical'}>
-              {#each expandedActions as action (action.id)}
-                {@const showIcon = action.rule.displayMode !== 'label'}
-                {@const showLabel = action.rule.displayMode !== 'icon'}
-                <button
-                  class="flex h-8 cursor-pointer items-center gap-0.5 px-1.75 transition-colors"
-                  class:hover:bg-btn-hover={mouseEntered}
-                  class:hover:text-primary={mouseEntered}
-                  onclick={() => executeAction(action)}
-                  title={action.label}
-                >
-                  {#if showIcon && action.icon}
-                    <Icon icon={action.icon} class="size-4.5 shrink-0" />
-                  {/if}
-                  {#if showLabel}
-                    <span class="max-w-30 truncate text-xs font-[450]">{action.label}</span>
-                  {/if}
-                </button>
-              {/each}
-            </div>
+            {/each}
           </div>
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
   {/if}
 </main>
@@ -659,5 +667,22 @@
     body {
       background: transparent;
     }
+  }
+
+  .folder-arrow-up {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid oklch(var(--bc) / 0.2);
+  }
+
+  .folder-arrow-left {
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-right: 5px solid oklch(var(--bc) / 0.2);
+    margin-top: 8px;
   }
 </style>
