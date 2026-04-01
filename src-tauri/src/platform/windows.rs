@@ -2,7 +2,7 @@ use crate::error::AppError;
 use std::fs;
 use std::path::Path;
 use windows::core::{Interface, PWSTR};
-use windows::Win32::Foundation::{HWND, LPARAM, MAX_PATH, WPARAM};
+use windows::Win32::Foundation::{LPARAM, MAX_PATH, WPARAM};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
 };
@@ -166,8 +166,8 @@ fn get_selection_via_win32_messages() -> Option<String> {
         SendMessageW(
             focused_hwnd,
             EM_GETSEL,
-            WPARAM(&mut start as *mut u32 as usize),
-            LPARAM(&mut end as *mut u32 as isize),
+            Some(WPARAM(&mut start as *mut u32 as usize)),
+            Some(LPARAM(&mut end as *mut u32 as isize)),
         );
 
         // no selection if start == end
@@ -182,7 +182,7 @@ fn get_selection_via_win32_messages() -> Option<String> {
 
         // get total text length
         let text_len =
-            SendMessageW(focused_hwnd, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
+            SendMessageW(focused_hwnd, WM_GETTEXTLENGTH, Some(WPARAM(0)), Some(LPARAM(0))).0 as usize;
         if text_len == 0 || end as usize > text_len {
             return None;
         }
@@ -192,8 +192,8 @@ fn get_selection_via_win32_messages() -> Option<String> {
         let copied = SendMessageW(
             focused_hwnd,
             WM_GETTEXT,
-            WPARAM(buffer.len()),
-            LPARAM(buffer.as_mut_ptr() as isize),
+            Some(WPARAM(buffer.len())),
+            Some(LPARAM(buffer.as_mut_ptr() as isize)),
         )
         .0 as usize;
 
