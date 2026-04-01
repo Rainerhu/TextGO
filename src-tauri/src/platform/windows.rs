@@ -146,16 +146,16 @@ pub fn get_selection() -> Result<String, AppError> {
             }
         }
 
-        // Strategy 2: search for Document controls with TextPattern in the foreground window
+        // Strategy 2: search for Document/Edit controls with TextPattern in the foreground window
         // This helps when the focused element itself doesn't support TextPattern
-        // but a parent/sibling Document element does (common in browsers)
+        // but a parent/sibling Document or Edit element does (common in browsers and editors)
         let hwnd = GetForegroundWindow();
         if !hwnd.is_invalid() {
             let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_ALL)
                 .map_err(|e| format!("Failed to create UI Automation instance: {}", e))?;
 
             if let Ok(root_element) = automation.ElementFromHandle(hwnd) {
-                // search for Document controls with text selection
+                // search for Document/Edit controls with text selection
                 if let Some(text) =
                     find_selection_in_descendants(&root_element, &automation)
                 {
@@ -172,7 +172,7 @@ pub fn get_selection() -> Result<String, AppError> {
 }
 
 /// Search for selected text in descendant elements with TextPattern.
-/// Tries Document controls first, then any element with TextPattern.
+/// Tries Document controls first, then Edit controls.
 unsafe fn find_selection_in_descendants(
     root_element: &IUIAutomationElement,
     automation: &IUIAutomation,
@@ -182,6 +182,15 @@ unsafe fn find_selection_in_descendants(
         root_element,
         automation,
         UIA_DocumentControlTypeId.0,
+    ) {
+        return Some(text);
+    }
+
+    // try Edit controls (covers standard text editors and some custom controls)
+    if let Some(text) = find_selection_by_control_type(
+        root_element,
+        automation,
+        UIA_EditControlTypeId.0,
     ) {
         return Some(text);
     }

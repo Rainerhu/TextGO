@@ -10,6 +10,18 @@
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { marked } from 'marked';
+
+  // configure marked to sanitize dangerous HTML
+  marked.use({
+    renderer: {
+      html(token) {
+        // strip script tags and event handlers from raw HTML blocks
+        return token.text
+          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+          .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+      }
+    }
+  });
   import {
     ArrowCircleRightIcon,
     ArrowClockwiseIcon,

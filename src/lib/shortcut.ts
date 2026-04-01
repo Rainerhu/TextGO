@@ -21,10 +21,11 @@ function wildcardMatch(pattern: string, input: string): boolean {
 
 /**
  * Compute group membership: rules use their own group field directly.
- * Folder markers are filtered out, rules keep their explicit group assignment.
+ * Folder markers are kept to preserve ordering; they will be used by the toolbar
+ * to determine folder position. Matchers already skip isFolder rules.
  */
 function getRulesWithGroups(rules: Rule[]): Rule[] {
-  return rules.filter((r) => !r.isFolder);
+  return rules;
 }
 
 /**
@@ -125,9 +126,9 @@ export class Manager {
         const s = shortcuts.current[LONG_PRESS_SHORTCUT];
         if (s && !s.disabled && s.rules && s.rules.length > 0) {
           // use registered rules (same as other shortcuts)
-          const activeRules = getRulesWithGroups(s.rules).filter((r) => !r.disabled);
+          const activeRules = getRulesWithGroups(s.rules).filter((r) => r.isFolder || !r.disabled);
           const filteredRules = filterRulesByApp(activeRules, appId);
-          if (filteredRules.length > 0) {
+          if (filteredRules.filter((r) => !r.isFolder).length > 0) {
             const layout = s.toolbarLayout || 'horizontal';
             const payload = JSON.stringify({ rules: filteredRules, selection, layout });
             await invoke('show_toolbar', { payload, mouse: true });
@@ -146,10 +147,11 @@ export class Manager {
         return;
       }
 
-      // get rules with explicit group assignments, filter out folder markers and disabled
-      const activeRules = getRulesWithGroups(s.rules).filter((r) => !r.disabled);
+      // get rules with explicit group assignments, keep folder markers for ordering
+      const activeRules = getRulesWithGroups(s.rules).filter((r) => r.isFolder || !r.disabled);
       const appFilteredRules = filterRulesByApp(activeRules, appId);
-      if (appFilteredRules.length === 0) {
+      // check if there are any actual (non-folder) rules after filtering
+      if (appFilteredRules.filter((r) => !r.isFolder).length === 0) {
         return;
       }
 
@@ -163,7 +165,22 @@ export class Manager {
           rules = appFilteredRules;
         } else {
           // find all matching rules
-          rules = await matchAll(selection, appFilteredRules);
+          const matchedRules = await matchAll(selection, appFilteredRules);
+          // re-insert folder markers at their original positions to preserve ordering
+          const matchedIds = new Set(matchedRules.map((r) => r.id));
+          rules = [];
+          for (const r of appFilteredRules) {
+            if (r.isFolder) {
+              // include folder marker only if at least one child rule matched
+              const hasMatchedChild = matchedRules.some((m) => m.group === r.id);
+              if (hasMatchedChild) {
+                rules.push(r);
+              }
+            } else if (matchedIds.has(r.id)) {
+              // find the matched version (which may have caseLabel set by matcher)
+              rules.push(matchedRules.find((m) => m.id === r.id)!);
+            }
+          }
         }
         if (rules.length === 0) {
           console.warn('No matching rules found');

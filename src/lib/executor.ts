@@ -344,8 +344,9 @@ const searcherExecutor: Executor = async (rule, entry) => {
   }
 
   console.debug(`Opening URL for searcher: ${searcherId}`);
-  // replace {{selection}} in URL template with trimmed selection
-  const result = searcher.url.replace(/\{\{selection\}\}/g, entry.selection.trim());
+  // replace {{selection}} in URL template with URL-encoded trimmed selection
+  const encoded = encodeURIComponent(entry.selection.trim());
+  const result = searcher.url.replace(/\{\{selection\}\}/g, encoded);
   // save history record
   entry.actionType = 'searcher';
   entry.actionLabel = searcherId;

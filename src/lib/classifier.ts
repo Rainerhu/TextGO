@@ -993,3 +993,6 @@ export function cleanup(maxAge: number = 60 * 60 * 1000) {
     console.debug(`Cleaned up ${toDelete.length} expired models`);
   }
 }
+
+// auto-cleanup: run every 10 minutes to evict expired models
+setInterval(() => cleanup(), 10 * 60 * 1000);

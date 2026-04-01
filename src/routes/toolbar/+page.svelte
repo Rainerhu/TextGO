@@ -63,6 +63,9 @@
   // matched actions to display
   let actions: Action[] = $state([]);
 
+  // original rules array (including folder markers) to preserve ordering
+  let originalRules: Rule[] = $state([]);
+
   // folder group type for toolbar display
   type FolderGroup = {
     name: string;
@@ -77,10 +80,13 @@
   // organized toolbar items (actions + folders), preserving rules array order
   let toolbarItems: ToolbarItem[] = $derived.by(() => {
     const items: ToolbarItem[] = [];
+    // build a lookup map from action id to Action object
+    const actionMap = new Map<string, Action>();
+    for (const action of actions) {
+      actionMap.set(action.rule.id, action);
+    }
+    // collect grouped actions by folder name
     const groupMap = new Map<string, Action[]>();
-    const addedGroups = new Set<string>();
-
-    // first pass: collect grouped actions
     for (const action of actions) {
       if (action.rule.group) {
         if (!groupMap.has(action.rule.group)) {
@@ -90,13 +96,15 @@
       }
     }
 
-    // second pass: build items in order, inserting folders at first occurrence
-    for (const action of actions) {
-      if (action.rule.group) {
-        if (!addedGroups.has(action.rule.group)) {
-          addedGroups.add(action.rule.group);
-          const groupName = action.rule.group;
-          const groupActions = groupMap.get(groupName)!;
+    // iterate original rules to preserve ordering
+    const addedGroups = new Set<string>();
+    for (const rule of originalRules) {
+      if (rule.isFolder) {
+        // folder marker — insert folder at this position
+        const groupName = rule.id;
+        const groupActions = groupMap.get(groupName);
+        if (groupActions && groupActions.length > 0 && !addedGroups.has(groupName)) {
+          addedGroups.add(groupName);
           const shortcutKey = groupActions[0]?.rule.shortcut;
           const groupConfig = shortcutKey ? shortcutStore.current[shortcutKey]?.groups?.[groupName] : undefined;
           items.push({
@@ -109,9 +117,14 @@
             }
           });
         }
-      } else {
-        items.push({ type: 'action', action });
+      } else if (!rule.group) {
+        // standalone rule — insert action at this position
+        const action = actionMap.get(rule.id);
+        if (action) {
+          items.push({ type: 'action', action });
+        }
       }
+      // grouped rules (rule.group set) are handled via their folder marker above
     }
     return items;
   });
@@ -239,8 +252,11 @@
     layout = (data.layout as 'horizontal' | 'vertical') || 'horizontal';
     expandedFolder = null;
 
-    // map rules to actions
-    actions = data.rules.map(mapToAction).filter((a) => !!a);
+    // save original rules (including folder markers) for ordering
+    originalRules = data.rules;
+
+    // map non-folder rules to actions
+    actions = data.rules.filter((r) => !r.isFolder).map(mapToAction).filter((a) => !!a);
     for (const action of actions) {
       if (action.rule.preview) {
         // replace label with preview result
