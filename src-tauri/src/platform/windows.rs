@@ -2,7 +2,7 @@ use crate::error::AppError;
 use std::fs;
 use std::path::Path;
 use windows::core::{Interface, PWSTR};
-use windows::Win32::Foundation::MAX_PATH;
+use windows::Win32::Foundation::{HWND, LPARAM, MAX_PATH, WPARAM};
 use windows::Win32::System::Com::{
     CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
 };
@@ -17,8 +17,8 @@ use windows::Win32::UI::Accessibility::{
     UIA_LegacyIAccessiblePatternId, UIA_TextPatternId, UIA_ValuePatternId,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetCursorInfo, GetForegroundWindow, GetWindowThreadProcessId, LoadCursorW, CURSORINFO,
-    CURSOR_SHOWING, IDC_IBEAM,
+    GetCursorInfo, GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, LoadCursorW,
+    SendMessageW, CURSORINFO, CURSOR_SHOWING, GUITHREADINFO, IDC_IBEAM,
 };
 
 // bounds validation constants
@@ -29,6 +29,11 @@ const MAX_VALID_COORDINATE: f64 = 10000.0;
 // editable legacy control roles
 const ROLE_SYSTEM_TEXT: u32 = 42;
 const ROLE_SYSTEM_COMBOBOX: u32 = 46;
+
+// Win32 Edit control messages for selection retrieval
+const WM_GETTEXT: u32 = 0x000D;
+const WM_GETTEXTLENGTH: u32 = 0x000E;
+const EM_GETSEL: u32 = 0x00B0;
 
 // import SafeArray functions from oleaut32.dll
 #[link(name = "oleaut32")]
@@ -127,6 +132,87 @@ fn get_selected_range(element: &IUIAutomationElement) -> Result<IUIAutomationTex
     }
 }
 
+/// Get selected text from focused Win32 control using SendMessage.
+/// This works for standard Edit/RichEdit controls that don't support UIA TextPattern.
+fn get_selection_via_win32_messages() -> Option<String> {
+    unsafe {
+        // get the foreground window's thread ID
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_invalid() {
+            return None;
+        }
+        let thread_id = GetWindowThreadProcessId(hwnd, None);
+        if thread_id == 0 {
+            return None;
+        }
+
+        // get the focused control handle via GetGUIThreadInfo
+        let mut gui_info = GUITHREADINFO {
+            cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+            ..Default::default()
+        };
+        if GetGUIThreadInfo(thread_id, &mut gui_info).is_err() {
+            return None;
+        }
+
+        let focused_hwnd = gui_info.hwndFocus;
+        if focused_hwnd.is_invalid() {
+            return None;
+        }
+
+        // get selection range via EM_GETSEL
+        let mut start: u32 = 0;
+        let mut end: u32 = 0;
+        SendMessageW(
+            focused_hwnd,
+            EM_GETSEL,
+            WPARAM(&mut start as *mut u32 as usize),
+            LPARAM(&mut end as *mut u32 as isize),
+        );
+
+        // no selection if start == end
+        if start == end {
+            return None;
+        }
+
+        // ensure start <= end
+        if start > end {
+            std::mem::swap(&mut start, &mut end);
+        }
+
+        // get total text length
+        let text_len =
+            SendMessageW(focused_hwnd, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 as usize;
+        if text_len == 0 || end as usize > text_len {
+            return None;
+        }
+
+        // allocate buffer and get full text (UTF-16)
+        let mut buffer = vec![0u16; text_len + 1];
+        let copied = SendMessageW(
+            focused_hwnd,
+            WM_GETTEXT,
+            WPARAM(buffer.len()),
+            LPARAM(buffer.as_mut_ptr() as isize),
+        )
+        .0 as usize;
+
+        if copied == 0 {
+            return None;
+        }
+
+        // extract the selected portion
+        let start = start as usize;
+        let end = (end as usize).min(copied);
+        if start >= end || start >= copied {
+            return None;
+        }
+
+        // convert UTF-16 slice to String
+        String::from_utf16(&buffer[start..end]).ok().filter(|s| !s.is_empty())
+    }
+}
+
 /// Get selected text in currently focused element.
 pub fn get_selection() -> Result<String, AppError> {
     unsafe {
@@ -166,7 +252,14 @@ pub fn get_selection() -> Result<String, AppError> {
             }
         }
 
-        // no selection found via UIA
+        // Strategy 3: try Win32 SendMessage approach for standard Edit/RichEdit controls
+        // This covers controls like Notepad's Edit control and other Win32 native controls
+        // that don't expose UIA TextPattern but respond to EM_GETSEL + WM_GETTEXT
+        if let Some(text) = get_selection_via_win32_messages() {
+            return Ok(text);
+        }
+
+        // no selection found via UIA or Win32 messages
         Ok(String::new())
     }
 }
@@ -199,6 +292,8 @@ unsafe fn find_selection_in_descendants(
 }
 
 /// Find selected text in elements of a specific control type.
+/// Searches all matching elements (not just the first) to handle windows with multiple
+/// Document/Edit controls (e.g., browsers with multiple iframes).
 unsafe fn find_selection_by_control_type(
     root_element: &IUIAutomationElement,
     automation: &IUIAutomation,
@@ -209,32 +304,50 @@ unsafe fn find_selection_by_control_type(
         .CreatePropertyCondition(UIA_ControlTypePropertyId, &control_type_id.into())
         .ok()?;
 
-    // find first matching element
-    let element = root_element
-        .FindFirst(TreeScope_Descendants, &condition)
+    // find all matching elements
+    let elements = root_element
+        .FindAll(TreeScope_Descendants, &condition)
         .ok()?;
 
-    // try to get TextPattern and selection
-    let text_pattern: IUIAutomationTextPattern = element
-        .GetCurrentPattern(UIA_TextPatternId)
-        .and_then(|p| p.cast())
-        .ok()?;
+    let count = elements.Length().unwrap_or(0);
+    for i in 0..count {
+        let element = match elements.GetElement(i) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
 
-    let text_ranges = text_pattern.GetSelection().ok()?;
+        // try to get TextPattern and selection
+        let text_pattern: IUIAutomationTextPattern = match element
+            .GetCurrentPattern(UIA_TextPatternId)
+            .and_then(|p| p.cast())
+        {
+            Ok(tp) => tp,
+            Err(_) => continue,
+        };
 
-    if text_ranges.Length().unwrap_or(0) == 0 {
-        return None;
+        let text_ranges = match text_pattern.GetSelection() {
+            Ok(tr) => tr,
+            Err(_) => continue,
+        };
+
+        if text_ranges.Length().unwrap_or(0) == 0 {
+            continue;
+        }
+
+        let range = match text_ranges.GetElement(0) {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+
+        if let Ok(text) = range.GetText(-1) {
+            let text = text.to_string();
+            if !text.is_empty() {
+                return Some(text);
+            }
+        }
     }
 
-    let range = text_ranges.GetElement(0).ok()?;
-    let text = range.GetText(-1).ok()?;
-    let text = text.to_string();
-
-    if text.is_empty() {
-        None
-    } else {
-        Some(text)
-    }
+    None
 }
 
 /// Get the coordinates of the bottom-right corner of the selected text.

@@ -84,6 +84,17 @@ async fn get_selection_fallback(app: AppHandle, mouse: bool) -> Result<String, A
                 "Clipboard did not change within {} ms, possibly no text selected",
                 max_wait_time.as_millis()
             );
+
+            // increase max wait time for next attempt since this one timed out
+            MAX_WAIT_TIME
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                    if current < 1000 {
+                        Some((current + 200).min(1000))
+                    } else {
+                        None
+                    }
+                })
+                .ok();
         } else {
             // cache the selected text with current timestamp
             #[cfg(target_os = "windows")]
@@ -91,13 +102,13 @@ async fn get_selection_fallback(app: AppHandle, mouse: bool) -> Result<String, A
                 *cache = Some((selected_text.clone(), std::time::Instant::now()));
             }
 
-            // adjust max wait time for next time
+            // decrease max wait time for next time since this one succeeded quickly
             MAX_WAIT_TIME
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
                     if current > 200 {
                         Some((current - 100).max(200))
                     } else {
-                        Some(current)
+                        None
                     }
                 })
                 .ok();
