@@ -158,6 +158,7 @@
   "provider_name_placeholder": "请输入提供商名称",
   "base_url": "API 地址",
   "base_url_placeholder": "例如: https://api.openai.com/v1",
+  "custom_base_url": "自定义地址（默认: {defaultUrl}）",
   "provider_added_success": "提供商添加成功！",
   "provider_updated_success": "提供商更新成功！",
   "web_search": "网页搜索",

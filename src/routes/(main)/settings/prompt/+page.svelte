@@ -10,14 +10,19 @@
   import { Loading } from '$lib/states.svelte';
   import {
     anthropicApiKey,
+    anthropicBaseUrl,
     geminiApiKey,
+    geminiBaseUrl,
     lmstudioHost,
     ollamaHost,
     openaiApiKey,
+    openaiBaseUrl,
     openrouterApiKey,
+    openrouterBaseUrl,
     prompts,
     providers,
-    xaiApiKey
+    xaiApiKey,
+    xaiBaseUrl
   } from '$lib/stores.svelte';
   import type { CustomLLMProvider, LLMProvider } from '$lib/types';
   import { invoke } from '@tauri-apps/api/core';
@@ -56,10 +61,15 @@
     ollamaHost: text().maxlength(256),
     lmstudioHost: text().maxlength(256),
     openrouterApiKey: password().maxlength(256),
+    openrouterBaseUrl: text().maxlength(256),
     openaiApiKey: password().maxlength(256),
+    openaiBaseUrl: text().maxlength(256),
     anthropicApiKey: password().maxlength(256),
+    anthropicBaseUrl: text().maxlength(256),
     geminiApiKey: password().maxlength(256),
+    geminiBaseUrl: text().maxlength(256),
     xaiApiKey: password().maxlength(256),
+    xaiBaseUrl: text().maxlength(256),
     // custom provider fields
     name: text().maxlength(64),
     baseUrl: text().maxlength(256),
@@ -246,12 +256,24 @@
         {...schema.openrouterApiKey}
         bind:value={openrouterApiKey.current}
       />
+      <input
+        class="input input-sm w-full"
+        placeholder={m.custom_base_url({ defaultUrl: 'https://openrouter.ai/api/v1' })}
+        {...schema.openrouterBaseUrl}
+        bind:value={openrouterBaseUrl.current}
+      />
       <Label icon={OpenAI}>OpenAI</Label>
       <input
         class="input w-full"
         placeholder={m.api_key({ provider: 'OpenAI' })}
         {...schema.openaiApiKey}
         bind:value={openaiApiKey.current}
+      />
+      <input
+        class="input input-sm w-full"
+        placeholder={m.custom_base_url({ defaultUrl: 'https://api.openai.com/v1' })}
+        {...schema.openaiBaseUrl}
+        bind:value={openaiBaseUrl.current}
       />
       <Label icon={Anthropic}>Anthropic</Label>
       <input
@@ -260,6 +282,12 @@
         {...schema.anthropicApiKey}
         bind:value={anthropicApiKey.current}
       />
+      <input
+        class="input input-sm w-full"
+        placeholder={m.custom_base_url({ defaultUrl: 'https://api.anthropic.com/v1' })}
+        {...schema.anthropicBaseUrl}
+        bind:value={anthropicBaseUrl.current}
+      />
       <Label icon={Gemini}>Gemini</Label>
       <input
         class="input w-full"
@@ -267,12 +295,24 @@
         {...schema.geminiApiKey}
         bind:value={geminiApiKey.current}
       />
+      <input
+        class="input input-sm w-full"
+        placeholder={m.custom_base_url({ defaultUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' })}
+        {...schema.geminiBaseUrl}
+        bind:value={geminiBaseUrl.current}
+      />
       <Label icon={XAI}>xAI</Label>
       <input
         class="input w-full"
         placeholder={m.api_key({ provider: 'xAI' })}
         {...schema.xaiApiKey}
         bind:value={xaiApiKey.current}
+      />
+      <input
+        class="input input-sm w-full"
+        placeholder={m.custom_base_url({ defaultUrl: 'https://api.x.ai/v1' })}
+        {...schema.xaiBaseUrl}
+        bind:value={xaiBaseUrl.current}
       />
       <!-- Custom LLM Providers -->
       <div class="divider mb-0 opacity-50">{m.custom_providers()}</div>

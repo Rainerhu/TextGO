@@ -1,4 +1,4 @@
-import { geminiApiKey } from '$lib/stores.svelte';
+import { geminiApiKey, geminiBaseUrl } from '$lib/stores.svelte';
 import { OpenAICompatibleClient } from './base';
 
 /**
@@ -12,6 +12,7 @@ export class GeminiClient extends OpenAICompatibleClient {
     if (!apiKey) {
       throw new Error('Google Gemini API key is not set');
     }
-    super('https://generativelanguage.googleapis.com/v1beta/openai', apiKey);
+    const baseUrl = geminiBaseUrl.current || 'https://generativelanguage.googleapis.com/v1beta/openai';
+    super(baseUrl, apiKey);
   }
 }

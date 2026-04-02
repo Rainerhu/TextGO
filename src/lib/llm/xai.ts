@@ -1,4 +1,4 @@
-import { xaiApiKey } from '$lib/stores.svelte';
+import { xaiApiKey, xaiBaseUrl } from '$lib/stores.svelte';
 import { OpenAICompatibleClient } from './base';
 
 /**
@@ -12,6 +12,7 @@ export class XAIClient extends OpenAICompatibleClient {
     if (!apiKey) {
       throw new Error('xAI API key is not set');
     }
-    super('https://api.x.ai/v1', apiKey);
+    const baseUrl = xaiBaseUrl.current || 'https://api.x.ai/v1';
+    super(baseUrl, apiKey);
   }
 }

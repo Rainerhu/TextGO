@@ -251,6 +251,13 @@ export const anthropicApiKey = persisted<string>('anthropicApiKey', '', { encryp
 export const geminiApiKey = persisted<string>('geminiApiKey', '', { encrypt, decrypt });
 export const xaiApiKey = persisted<string>('xaiApiKey', '', { encrypt, decrypt });
 
+// Custom base URLs for Cloud LLM providers
+export const openrouterBaseUrl = persisted<string>('openrouterBaseUrl', '');
+export const openaiBaseUrl = persisted<string>('openaiBaseUrl', '');
+export const anthropicBaseUrl = persisted<string>('anthropicBaseUrl', '');
+export const geminiBaseUrl = persisted<string>('geminiBaseUrl', '');
+export const xaiBaseUrl = persisted<string>('xaiBaseUrl', '');
+
 // Custom LLM providers
 export const providers = persisted<CustomLLMProvider[]>('providers', [], {
   encrypt: (providers) => providers.map((p) => ({ ...p, apiKey: encrypt(p.apiKey) })),

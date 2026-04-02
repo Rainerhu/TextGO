@@ -1,4 +1,4 @@
-import { openaiApiKey } from '$lib/stores.svelte';
+import { openaiApiKey, openaiBaseUrl } from '$lib/stores.svelte';
 import { OpenAICompatibleClient } from './base';
 
 /**
@@ -12,6 +12,7 @@ export class OpenAIClient extends OpenAICompatibleClient {
     if (!apiKey) {
       throw new Error('OpenAI API key is not set');
     }
-    super('https://api.openai.com/v1', apiKey);
+    const baseUrl = openaiBaseUrl.current || 'https://api.openai.com/v1';
+    super(baseUrl, apiKey);
   }
 }

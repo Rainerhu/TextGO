@@ -40,6 +40,23 @@ export abstract class OpenAICompatibleClient implements LLMClient {
     this.abortController = new AbortController();
 
     try {
+      // build request body, only include optional parameters when they are defined
+      const body: Record<string, unknown> = {
+        stream: true,
+        model: request.model,
+        messages: request.messages
+      };
+      if (request.max_tokens != null) {
+        body.max_tokens = request.max_tokens;
+        body.max_completion_tokens = request.max_tokens;
+      }
+      if (request.temperature != null) {
+        body.temperature = request.temperature;
+      }
+      if (request.top_p != null) {
+        body.top_p = request.top_p;
+      }
+
       // send request to OpenAI-compatible endpoint using Tauri's fetch
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -48,15 +65,7 @@ export abstract class OpenAICompatibleClient implements LLMClient {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this.apiKey}`
         },
-        body: JSON.stringify({
-          stream: true,
-          model: request.model,
-          messages: request.messages,
-          max_tokens: request.max_tokens,
-          max_completion_tokens: request.max_tokens,
-          temperature: request.temperature,
-          top_p: request.top_p
-        }),
+        body: JSON.stringify(body),
         signal: this.abortController.signal
       });
 

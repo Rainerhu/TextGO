@@ -1,4 +1,4 @@
-import { anthropicApiKey } from '$lib/stores.svelte';
+import { anthropicApiKey, anthropicBaseUrl } from '$lib/stores.svelte';
 import { OpenAICompatibleClient } from './base';
 
 /**
@@ -12,6 +12,7 @@ export class AnthropicClient extends OpenAICompatibleClient {
     if (!apiKey) {
       throw new Error('Anthropic API key is not set');
     }
-    super('https://api.anthropic.com/v1', apiKey);
+    const baseUrl = anthropicBaseUrl.current || 'https://api.anthropic.com/v1';
+    super(baseUrl, apiKey);
   }
 }

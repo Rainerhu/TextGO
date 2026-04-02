@@ -1,4 +1,4 @@
-import { openrouterApiKey } from '$lib/stores.svelte';
+import { openrouterApiKey, openrouterBaseUrl } from '$lib/stores.svelte';
 import { OpenAICompatibleClient } from './base';
 
 /**
@@ -12,6 +12,7 @@ export class OpenRouterClient extends OpenAICompatibleClient {
     if (!apiKey) {
       throw new Error('OpenRouter API key is not set');
     }
-    super('https://openrouter.ai/api/v1', apiKey);
+    const baseUrl = openrouterBaseUrl.current || 'https://openrouter.ai/api/v1';
+    super(baseUrl, apiKey);
   }
 }
