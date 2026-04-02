@@ -20,26 +20,6 @@ export default defineConfig({
   esbuild: {
     drop: env === 'production' ? ['console', 'debugger'] : []
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          // isolate TensorFlow.js into its own chunk for lazy loading
-          if (id.includes('@tensorflow/tfjs')) {
-            return 'tensorflow';
-          }
-          // isolate CodeMirror into its own chunk
-          if (id.includes('@codemirror') || id.includes('codemirror')) {
-            return 'codemirror';
-          }
-          // isolate OpenAI SDK into its own chunk for lazy loading
-          if (id.includes('openai')) {
-            return 'openai';
-          }
-        }
-      }
-    }
-  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
