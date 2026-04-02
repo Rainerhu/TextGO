@@ -1,4 +1,21 @@
-import * as tf from '@tensorflow/tfjs';
+import type * as TF from '@tensorflow/tfjs';
+
+// lazy-loaded TensorFlow.js module
+let _tf: typeof TF | null = null;
+async function loadTf(): Promise<typeof TF> {
+  if (!_tf) {
+    _tf = await import('@tensorflow/tfjs');
+  }
+  return _tf;
+}
+
+// synchronous access for code paths where TF is already loaded
+function tf(): typeof TF {
+  if (!_tf) {
+    throw new Error('TensorFlow.js not loaded yet. Call loadTf() first.');
+  }
+  return _tf;
+}
 
 /**
  * Model storage key constants.
@@ -41,7 +58,7 @@ const DEFAULT_TRAINING_CONFIG: Required<TrainingConfig> = {
  * Model cache interface.
  */
 interface ModelCache {
-  model: tf.LayersModel;
+  model: TF.LayersModel;
   tokenizer: Map<string, number>;
   config: {
     maxSequenceLength: number;
@@ -64,7 +81,7 @@ const MODEL_CACHE = new Map<string, ModelCache>();
  */
 export class Classifier {
   private id: string;
-  private model: tf.LayersModel | null = null;
+  private model: TF.LayersModel | null = null;
   private tokenizer: Map<string, number> = new Map();
   private embeddingDim: number;
   private maxSequenceLength: number;
@@ -100,6 +117,9 @@ export class Classifier {
     if (!processedData) {
       throw new Error('Training data format invalid or insufficient samples');
     }
+
+    // ensure TensorFlow.js is loaded
+    await loadTf();
 
     try {
       // 1. build vocabulary
@@ -151,27 +171,27 @@ export class Classifier {
   }
 
   // create single-class classification model
-  private createModel(): tf.LayersModel {
+  private createModel(): TF.LayersModel {
     console.debug(`Creating single-class model, vocabulary size: ${this.tokenizer.size}`);
 
-    const model = tf.sequential({
+    const model = tf().sequential({
       layers: [
         // embedding layer
-        tf.layers.embedding({
+        tf().layers.embedding({
           inputDim: this.tokenizer.size + 1,
           outputDim: this.embeddingDim,
           inputLength: this.maxSequenceLength
         }),
 
         // global average pooling
-        tf.layers.globalAveragePooling1d(),
+        tf().layers.globalAveragePooling1d(),
 
         // hidden layer
-        tf.layers.dense({ units: 16, activation: 'relu' }),
-        tf.layers.dropout({ rate: 0.3 }),
+        tf().layers.dense({ units: 16, activation: 'relu' }),
+        tf().layers.dropout({ rate: 0.3 }),
 
         // output layer: single neuron, sigmoid activation for binary classification
-        tf.layers.dense({
+        tf().layers.dense({
           units: 1,
           activation: 'sigmoid'
         })
@@ -180,7 +200,7 @@ export class Classifier {
 
     // use binary classification loss function
     model.compile({
-      optimizer: tf.train.adam(this.trainingConfig.learningRate),
+      optimizer: tf().train.adam(this.trainingConfig.learningRate),
       loss: 'binaryCrossentropy',
       metrics: ['accuracy']
     });
@@ -429,8 +449,8 @@ export class Classifier {
     });
 
     // convert to tensors
-    const inputTensor = tf.tensor2d(sequences, [sequences.length, this.maxSequenceLength], 'float32');
-    const labelsTensor = tf.tensor1d(labels, 'float32');
+    const inputTensor = tf().tensor2d(sequences, [sequences.length, this.maxSequenceLength], 'float32');
+    const labelsTensor = tf().tensor1d(labels, 'float32');
 
     console.debug(`Creating tensors - Input: shape=${inputTensor.shape}, dtype=${inputTensor.dtype}`);
     console.debug(`Creating tensors - Labels: shape=${labelsTensor.shape}, dtype=${labelsTensor.dtype}`);
@@ -632,10 +652,10 @@ export class Classifier {
       }
     }
 
-    // use tf.tidy to ensure proper memory cleanup even if errors occur
-    return tf.tidy(() => {
-      const input = tf.tensor2d([sequence], [1, this.maxSequenceLength], 'float32');
-      const prediction = this.model!.predict(input) as tf.Tensor;
+    // use tf().tidy to ensure proper memory cleanup even if errors occur
+    return tf().tidy(() => {
+      const input = tf().tensor2d([sequence], [1, this.maxSequenceLength], 'float32');
+      const prediction = this.model!.predict(input) as TF.Tensor;
       const confidence = prediction.dataSync()[0]; // probability value of sigmoid output
 
       console.debug(`Raw prediction confidence: ${confidence}`);
@@ -716,7 +736,7 @@ export class Classifier {
 
       // load TensorFlow model
       const storageKey = `${STORAGE.CLASSIFIER}_${this.id}`;
-      this.model = await tf.loadLayersModel(`localstorage://${storageKey}`);
+      this.model = await (await loadTf()).loadLayersModel(`localstorage://${storageKey}`);
       console.debug('TensorFlow model loaded successfully');
 
       // restore tokenizer
@@ -791,8 +811,8 @@ export class Classifier {
       );
     }
 
-    console.debug(`TensorFlow.js backend: ${tf.getBackend()}`);
-    console.debug(`Memory: ${JSON.stringify(tf.memory())}`);
+    console.debug(`TensorFlow.js backend: ${_tf ? tf().getBackend() : 'not loaded'}`);
+    console.debug(`Memory: ${_tf ? JSON.stringify(tf().memory()) : 'N/A'}`);
   }
 
   // validate training data format
@@ -970,7 +990,7 @@ export async function predict(modelId: string, text: string): Promise<number | n
  *
  * @param maxAge - maximum lifetime (milliseconds), default 1 hour
  */
-export function cleanup(maxAge: number = 60 * 60 * 1000) {
+export function cleanup(maxAge: number = 30 * 60 * 1000) {
   const now = Date.now();
   const toDelete: string[] = [];
 
@@ -994,5 +1014,5 @@ export function cleanup(maxAge: number = 60 * 60 * 1000) {
   }
 }
 
-// auto-cleanup: run every 10 minutes to evict expired models
-setInterval(() => cleanup(), 10 * 60 * 1000);
+// auto-cleanup: run every 5 minutes to evict expired models
+setInterval(() => cleanup(), 5 * 60 * 1000);

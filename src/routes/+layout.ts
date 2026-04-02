@@ -19,21 +19,24 @@ export const load: LayoutLoad = async () => {
   forwardConsole('warn', warn);
   forwardConsole('error', error);
 
-  // set default properties for Tippy.js globally
-  // https://atomiks.github.io/tippyjs/v6/methods/#setdefaultprops
-  tippy.setDefaultProps({
-    zIndex: 100,
-    maxWidth: 300,
-    arrow: false,
-    theme: 'default',
-    animation: 'scale',
-    placement: 'bottom',
-    trigger: 'mouseenter',
-    plugins: [followCursor]
-  });
+  const windowLabel = getCurrentWindow().label;
 
-  // initialize tray menu language
-  if (getCurrentWindow().label === 'main') {
+  // only initialize tippy.js on main window (popup and toolbar don't use tooltips)
+  if (windowLabel === 'main') {
+    // set default properties for Tippy.js globally
+    // https://atomiks.github.io/tippyjs/v6/methods/#setdefaultprops
+    tippy.setDefaultProps({
+      zIndex: 100,
+      maxWidth: 300,
+      arrow: false,
+      theme: 'default',
+      animation: 'scale',
+      placement: 'bottom',
+      trigger: 'mouseenter',
+      plugins: [followCursor]
+    });
+
+    // initialize tray menu language
     await setupTray();
   }
 

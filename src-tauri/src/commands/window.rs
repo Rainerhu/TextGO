@@ -5,7 +5,8 @@ use enigo::Mouse;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Position, WebviewWindow};
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Position, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use tauri_plugin_store::StoreExt;
 
 // structure to hold window placement information
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -68,23 +69,95 @@ pub fn mark_toolbar_initialized() {
     TOOLBAR_INITIALIZED.store(true, Ordering::Relaxed);
 }
 
+/// Ensure popup window exists, creating it dynamically if needed.
+/// Returns the popup WebviewWindow handle.
+fn ensure_popup_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
+    // return existing window if it's already alive
+    if let Some(window) = app.get_webview_window("popup") {
+        return Ok(window);
+    }
+
+    // reset initialization flag for the new window
+    POPUP_INITIALIZED.store(false, Ordering::Relaxed);
+
+    // create popup window dynamically
+    let window = WebviewWindowBuilder::new(app, "popup", WebviewUrl::App("/popup".into()))
+        .inner_size(400.0, 300.0)
+        .visible(false)
+        .shadow(false)
+        .decorations(false)
+        .transparent(true)
+        .skip_taskbar(true)
+        .always_on_top(true)
+        .resizable(true)
+        .build()?;
+
+    // setup focus-loss auto-hide behavior
+    let app_handle = app.clone();
+
+    #[cfg(target_os = "windows")]
+    let popup_window = window.clone();
+
+    window.on_window_event(move |event| {
+        match event {
+            WindowEvent::Focused(false) => {
+                if let Ok(store) = app_handle.store(crate::SETTINGS_STORE) {
+                    let popup_pinned = store.get("popupPinned").and_then(|v| v.as_bool());
+                    if !popup_pinned.unwrap_or(false) {
+                        // check focus state again after 100ms delay on Windows
+                        #[cfg(target_os = "windows")]
+                        {
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                            if popup_window.is_focused().unwrap_or(false) {
+                                return;
+                            }
+                        }
+
+                        // destroy popup window to free memory
+                        destroy_popup_window(&app_handle);
+                    }
+                }
+            }
+            WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                // destroy popup window to free memory
+                destroy_popup_window(&app_handle);
+            }
+            _ => {}
+        }
+    });
+
+    Ok(window)
+}
+
+/// Destroy popup window to free WebView memory.
+pub fn destroy_popup_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("popup") {
+        // emit hide event before destroying
+        let _ = app.emit("hide-popup", ());
+        // destroy the window to free WebView memory
+        let _ = window.destroy();
+        // reset initialization flag
+        POPUP_INITIALIZED.store(false, Ordering::Relaxed);
+        log::info!("Popup window destroyed to free memory");
+    }
+}
+
 /// Show popup window and position it near the cursor.
 #[tauri::command]
 pub fn show_popup(app: AppHandle, payload: String, mouse: Option<bool>) -> Result<(), AppError> {
-    if let Some(window) = app.get_webview_window("popup") {
-        // position window near cursor
-        position_window_near_cursor(&window, mouse.unwrap_or(false))?;
+    let window = ensure_popup_window(&app)?;
 
-        // show and focus window
-        if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
-            show_window(&app, "popup");
-        }
+    // position window near cursor
+    position_window_near_cursor(&window, mouse.unwrap_or(false))?;
 
-        // wait for initialization and emit event
-        wait_and_emit(&POPUP_INITIALIZED, window, payload);
-    } else {
-        return Err("Popup window not found".into());
+    // show and focus window
+    if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
+        show_window(&app, "popup");
     }
+
+    // wait for initialization and emit event
+    wait_and_emit(&POPUP_INITIALIZED, window, payload);
 
     Ok(())
 }
@@ -96,52 +169,50 @@ pub fn show_popup_sameplace(
     payload: String,
     placement: WindowPlacement,
 ) -> Result<(), AppError> {
-    if let Some(window) = app.get_webview_window("popup") {
-        // set window position with safe area constraints if screen info is provided
-        let position = if let (Some(screen_size), Some(screen_position)) =
-            (placement.screen_size, placement.screen_position)
-        {
-            // get popup window size
-            let window_size = window.outer_size()?;
-            let scale_factor = window.scale_factor()?;
-            let window_width = window_size.width as f64 / scale_factor;
-            let window_height = window_size.height as f64 / scale_factor;
+    let window = ensure_popup_window(&app)?;
 
-            // get screen size and position
-            let screen_width = screen_size.width;
-            let screen_height = screen_size.height;
-            let screen_x = screen_position.x;
-            let screen_y = screen_position.y;
+    // set window position with safe area constraints if screen info is provided
+    let position = if let (Some(screen_size), Some(screen_position)) =
+        (placement.screen_size, placement.screen_position)
+    {
+        // get popup window size
+        let window_size = window.outer_size()?;
+        let scale_factor = window.scale_factor()?;
+        let window_width = window_size.width as f64 / scale_factor;
+        let window_height = window_size.height as f64 / scale_factor;
 
-            // calculate safe area for window
-            let safe_area_bottom = SAFE_AREA_BOTTOM as f64 / scale_factor;
-            let min_x = screen_x;
-            let max_x = (screen_x + screen_width - window_width).max(min_x);
-            let min_y = screen_y;
-            let max_y = (screen_y + screen_height - window_height - safe_area_bottom).max(min_y);
+        // get screen size and position
+        let screen_width = screen_size.width;
+        let screen_height = screen_size.height;
+        let screen_x = screen_position.x;
+        let screen_y = screen_position.y;
 
-            // clamp window position to safe area
-            LogicalPosition {
-                x: placement.window_position.x.clamp(min_x, max_x),
-                y: placement.window_position.y.clamp(min_y, max_y),
-            }
-        } else {
-            // use window position directly if screen info is not available
-            placement.window_position
-        };
+        // calculate safe area for window
+        let safe_area_bottom = SAFE_AREA_BOTTOM as f64 / scale_factor;
+        let min_x = screen_x;
+        let max_x = (screen_x + screen_width - window_width).max(min_x);
+        let min_y = screen_y;
+        let max_y = (screen_y + screen_height - window_height - safe_area_bottom).max(min_y);
 
-        window.set_position(Position::Logical(position))?;
-
-        // show and focus window
-        if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
-            show_window(&app, "popup");
+        // clamp window position to safe area
+        LogicalPosition {
+            x: placement.window_position.x.clamp(min_x, max_x),
+            y: placement.window_position.y.clamp(min_y, max_y),
         }
-
-        // wait for initialization and emit event
-        wait_and_emit(&POPUP_INITIALIZED, window, payload);
     } else {
-        return Err("Popup window not found".into());
+        // use window position directly if screen info is not available
+        placement.window_position
+    };
+
+    window.set_position(Position::Logical(position))?;
+
+    // show and focus window
+    if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
+        show_window(&app, "popup");
     }
+
+    // wait for initialization and emit event
+    wait_and_emit(&POPUP_INITIALIZED, window, payload);
 
     Ok(())
 }
@@ -342,6 +413,12 @@ pub fn show_window(app: &AppHandle, label: &str) -> Option<WebviewWindow> {
 
 /// Hide window.
 pub fn hide_window(app: &AppHandle, label: &str) -> Option<WebviewWindow> {
+    if label == "popup" {
+        // destroy popup window to free WebView memory
+        destroy_popup_window(app);
+        return None;
+    }
+
     if let Some(window) = app.get_webview_window(label) {
         let _ = window.hide();
 

@@ -257,35 +257,41 @@ export const PROGRAMMING_CASES: Option[] = [
 // natural language detection options for franc
 const FRANC_OPTIONS = { minLength: 2, only: NATURAL_CASES.map((c) => c.value as string) };
 
-// create programming language recognition model instance
-const MODEL_OPERATIONS = new ModelOperations({
-  // custom JSON model loader function
-  modelJsonLoaderFunc: async () => {
-    try {
-      const response = await fetch('/model.json');
-      if (!response.ok) {
-        throw new Error(`Unable to load model JSON file: ${response.status}`);
+// lazily initialized programming language recognition model instance
+let _modelOperations: ModelOperations | null = null;
+function getModelOperations(): ModelOperations {
+  if (!_modelOperations) {
+    _modelOperations = new ModelOperations({
+      // custom JSON model loader function
+      modelJsonLoaderFunc: async () => {
+        try {
+          const response = await fetch('/model.json');
+          if (!response.ok) {
+            throw new Error(`Unable to load model JSON file: ${response.status}`);
+          }
+          return await response.json();
+        } catch (error) {
+          console.error(`Failed to load model JSON file: ${error}`);
+          throw error;
+        }
+      },
+      // custom weights file loader function
+      weightsLoaderFunc: async () => {
+        try {
+          const response = await fetch('/group1-shard1of1.bin');
+          if (!response.ok) {
+            throw new Error(`Unable to load model weights file: ${response.status}`);
+          }
+          return await response.arrayBuffer();
+        } catch (error) {
+          console.error(`Failed to load model weights file: ${error}`);
+          throw error;
+        }
       }
-      return await response.json();
-    } catch (error) {
-      console.error(`Failed to load model JSON file: ${error}`);
-      throw error;
-    }
-  },
-  // custom weights file loader function
-  weightsLoaderFunc: async () => {
-    try {
-      const response = await fetch('/group1-shard1of1.bin');
-      if (!response.ok) {
-        throw new Error(`Unable to load model weights file: ${response.status}`);
-      }
-      return await response.arrayBuffer();
-    } catch (error) {
-      console.error(`Failed to load model weights file: ${error}`);
-      throw error;
-    }
+    });
   }
-});
+  return _modelOperations;
+}
 
 // minimum expected confidence
 const MIN_CONFIDENCE = 0.2;
@@ -368,7 +374,7 @@ const programmingMatcher: Matcher = async (context) => {
     try {
       // lazy load programming language detection results
       if (context.programmingLangs === null) {
-        context.programmingLangs = await MODEL_OPERATIONS.runModel(context.text);
+        context.programmingLangs = await getModelOperations().runModel(context.text);
         console.debug(`Programming language detection result: ${JSON.stringify(context.programmingLangs)}`);
       }
       if (matchProgrammingCase(context.rule.case, context.programmingLangs)) {
@@ -622,7 +628,7 @@ async function matchModelCase(model: Model, text: string): Promise<boolean> {
 export async function guessProgrammingLanguage(text: string, langs: string[]): Promise<string | null> {
   try {
     // run programming language detection model
-    let results = await MODEL_OPERATIONS.runModel(text);
+    let results = await getModelOperations().runModel(text);
     // filter results to only include possible languages
     results = results.filter((result) => langs.includes(result.languageId));
     if (results.length === 0) {

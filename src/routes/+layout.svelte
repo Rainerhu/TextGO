@@ -3,6 +3,7 @@
   import { Alert, Confirm } from '$lib/components';
   import { theme } from '$lib/stores.svelte';
   import { platform } from '@tauri-apps/plugin-os';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import type { Snippet } from 'svelte';
   import { onMount } from 'svelte';
   import { MediaQuery } from 'svelte/reactivity';
@@ -10,11 +11,17 @@
   import '@fontsource-variable/noto-sans';
   import '@fontsource-variable/noto-sans-sc';
   // import styles
-  import 'tippy.js/animations/scale.css';
-  import 'tippy.js/dist/tippy.css';
   import '../app.css';
 
   let { children }: { children: Snippet } = $props();
+
+  const isMainWindow = getCurrentWindow().label === 'main';
+
+  // only load tippy.js styles on main window (popup and toolbar don't use tooltips)
+  if (isMainWindow) {
+    import('tippy.js/animations/scale.css');
+    import('tippy.js/dist/tippy.css');
+  }
 
   // auto switch theme when system theme changes
   const prefersDark = new MediaQuery('(prefers-color-scheme: dark)');
@@ -61,8 +68,8 @@
 
 {@render children()}
 
-<!-- global alert component -->
-<Alert />
-
-<!-- global confirm component -->
-<Confirm />
+<!-- global alert and confirm components only needed on main window -->
+{#if isMainWindow}
+  <Alert />
+  <Confirm />
+{/if}

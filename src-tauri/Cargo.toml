@@ -56,3 +56,14 @@ windows = { version = "0.62.2", features = [
   "Win32_UI_Accessibility",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+
+[profile.release]
+# optimize for size to reduce memory footprint
+opt-level = "s"
+# enable LTO for better dead code elimination
+lto = true
+# single codegen unit for better optimization
+codegen-units = 1
+# strip debug symbols
+strip = true

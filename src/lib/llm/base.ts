@@ -3,7 +3,6 @@ import type {
   ChatCompletionChunk,
   ChatCompletionCreateParamsBase as ChatCompletionParams
 } from 'openai/resources/chat/completions';
-import { Stream } from 'openai/streaming';
 
 /**
  * LLM Client interface.
@@ -78,6 +77,7 @@ export abstract class OpenAICompatibleClient implements LLMClient {
       }
 
       // use OpenAI SDK's Stream to handle SSE parsing
+      const { Stream } = await import('openai/streaming');
       const stream = Stream.fromSSEResponse<ChatCompletionChunk>(response, this.abortController);
       for await (const chunk of stream) {
         yield chunk.choices[0]?.delta.content || '';
