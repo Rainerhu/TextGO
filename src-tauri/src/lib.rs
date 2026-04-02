@@ -249,8 +249,98 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         }),
     );
 
-    // toolbar and popup windows are created dynamically on demand
-    // (see commands/window.rs ensure_toolbar_window / ensure_popup_window)
+    // setup toolbar window
+    setup_window(
+        app,
+        "toolbar",
+        #[allow(unused_variables)]
+        Some(|window: &WebviewWindow, app: &AppHandle| {
+            // convert to panel on macOS
+            #[cfg(target_os = "macos")]
+            {
+                if let Ok(panel) = window.to_panel::<ToolbarPanel>() {
+                    let handler = ToolbarPanelEventHandler::new();
+
+                    // setup mouse hover activation
+                    let app_handle = app.clone();
+                    let window_label = window.label().to_string();
+                    handler.on_mouse_entered(move |_event| {
+                        if let Ok(panel) = app_handle.get_webview_panel(&window_label) {
+                            panel.make_key_window();
+                            let _ = app_handle.emit("toolbar-entered", ());
+                        }
+                    });
+
+                    let app_handle = app.clone();
+                    let window_label = window.label().to_string();
+                    handler.on_mouse_exited(move |_event| {
+                        if let Ok(panel) = app_handle.get_webview_panel(&window_label) {
+                            panel.resign_key_window();
+                            let _ = app_handle.emit("toolbar-exited", ());
+                        }
+                    });
+
+                    // set the window to custom level 5
+                    // above normal floating windows (level 4)
+                    panel.set_level(PanelLevel::Custom(5).value());
+
+                    // prevent app activation when clicked
+                    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
+
+                    // allow display over fullscreen windows and on all spaces
+                    panel.set_collection_behavior(
+                        CollectionBehavior::new()
+                            .full_screen_auxiliary()
+                            .can_join_all_spaces()
+                            .into(),
+                    );
+
+                    // attach the event handler
+                    panel.set_event_handler(Some(handler.as_ref()));
+                }
+            }
+
+            // prevent position deviation on first show
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                width: 1.0,
+                height: 1.0,
+            }));
+        }),
+    );
+
+    // setup popup window
+    setup_window(
+        app,
+        "popup",
+        Some(|window: &WebviewWindow, app: &AppHandle| {
+            let app_handle = app.clone();
+
+            #[cfg(target_os = "windows")]
+            let popup_window = window.clone();
+
+            // hide popup window when it loses focus if not pinned
+            window.on_window_event(move |event| {
+                if let WindowEvent::Focused(false) = event {
+                    if let Ok(store) = app_handle.store(SETTINGS_STORE) {
+                        let popup_pinned = store.get("popupPinned").and_then(|v| v.as_bool());
+                        if !popup_pinned.unwrap_or(false) {
+                            // check focus state again after 100ms delay on Windows
+                            // https://github.com/tauri-apps/tauri/issues/10767
+                            #[cfg(target_os = "windows")]
+                            {
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                                if popup_window.is_focused().unwrap_or(false) {
+                                    return;
+                                }
+                            }
+
+                            hide_window(&app_handle, "popup");
+                        }
+                    }
+                }
+            });
+        }),
+    );
 
     // listen for deep link URLs
     app.deep_link().on_open_url(move |event| {

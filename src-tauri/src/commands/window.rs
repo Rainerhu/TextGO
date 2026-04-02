@@ -5,8 +5,7 @@ use enigo::Mouse;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Position, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
-use tauri_plugin_store::StoreExt;
+use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Position, WebviewWindow};
 
 // structure to hold window placement information
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -69,95 +68,23 @@ pub fn mark_toolbar_initialized() {
     TOOLBAR_INITIALIZED.store(true, Ordering::Relaxed);
 }
 
-/// Ensure popup window exists, creating it dynamically if needed.
-/// Returns the popup WebviewWindow handle.
-fn ensure_popup_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
-    // return existing window if it's already alive
-    if let Some(window) = app.get_webview_window("popup") {
-        return Ok(window);
-    }
-
-    // reset initialization flag for the new window
-    POPUP_INITIALIZED.store(false, Ordering::Relaxed);
-
-    // create popup window dynamically
-    let window = WebviewWindowBuilder::new(app, "popup", WebviewUrl::App("/popup".into()))
-        .inner_size(400.0, 300.0)
-        .visible(false)
-        .shadow(false)
-        .decorations(false)
-        .transparent(true)
-        .skip_taskbar(true)
-        .always_on_top(true)
-        .resizable(true)
-        .build()?;
-
-    // setup focus-loss auto-hide behavior
-    let app_handle = app.clone();
-
-    #[cfg(target_os = "windows")]
-    let popup_window = window.clone();
-
-    window.on_window_event(move |event| {
-        match event {
-            WindowEvent::Focused(false) => {
-                if let Ok(store) = app_handle.store(crate::SETTINGS_STORE) {
-                    let popup_pinned = store.get("popupPinned").and_then(|v| v.as_bool());
-                    if !popup_pinned.unwrap_or(false) {
-                        // check focus state again after 100ms delay on Windows
-                        #[cfg(target_os = "windows")]
-                        {
-                            std::thread::sleep(std::time::Duration::from_millis(100));
-                            if popup_window.is_focused().unwrap_or(false) {
-                                return;
-                            }
-                        }
-
-                        // destroy popup window to free memory
-                        destroy_popup_window(&app_handle);
-                    }
-                }
-            }
-            WindowEvent::CloseRequested { api, .. } => {
-                api.prevent_close();
-                // destroy popup window to free memory
-                destroy_popup_window(&app_handle);
-            }
-            _ => {}
-        }
-    });
-
-    Ok(window)
-}
-
-/// Destroy popup window to free WebView memory.
-pub fn destroy_popup_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("popup") {
-        // emit hide event before destroying
-        let _ = app.emit("hide-popup", ());
-        // destroy the window to free WebView memory
-        let _ = window.destroy();
-        // reset initialization flag
-        POPUP_INITIALIZED.store(false, Ordering::Relaxed);
-        log::info!("Popup window destroyed to free memory");
-    }
-}
-
 /// Show popup window and position it near the cursor.
 #[tauri::command]
 pub fn show_popup(app: AppHandle, payload: String, mouse: Option<bool>) -> Result<(), AppError> {
-    let window = ensure_popup_window(&app)?;
+    if let Some(window) = app.get_webview_window("popup") {
+        // position window near cursor
+        position_window_near_cursor(&window, mouse.unwrap_or(false))?;
 
-    // position window near cursor
-    position_window_near_cursor(&window, mouse.unwrap_or(false))?;
+        // show and focus window
+        if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
+            show_window(&app, "popup");
+        }
 
-    // show and focus window
-    if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
-        show_window(&app, "popup");
+        // wait for initialization and emit event
+        wait_and_emit(&POPUP_INITIALIZED, window, payload);
+    } else {
+        return Err("Popup window not found".into());
     }
-
-    // wait for initialization and emit event
-    wait_and_emit(&POPUP_INITIALIZED, window, payload);
 
     Ok(())
 }
@@ -169,162 +96,73 @@ pub fn show_popup_sameplace(
     payload: String,
     placement: WindowPlacement,
 ) -> Result<(), AppError> {
-    let window = ensure_popup_window(&app)?;
+    if let Some(window) = app.get_webview_window("popup") {
+        // set window position with safe area constraints if screen info is provided
+        let position = if let (Some(screen_size), Some(screen_position)) =
+            (placement.screen_size, placement.screen_position)
+        {
+            // get popup window size
+            let window_size = window.outer_size()?;
+            let scale_factor = window.scale_factor()?;
+            let window_width = window_size.width as f64 / scale_factor;
+            let window_height = window_size.height as f64 / scale_factor;
 
-    // set window position with safe area constraints if screen info is provided
-    let position = if let (Some(screen_size), Some(screen_position)) =
-        (placement.screen_size, placement.screen_position)
-    {
-        // get popup window size
-        let window_size = window.outer_size()?;
-        let scale_factor = window.scale_factor()?;
-        let window_width = window_size.width as f64 / scale_factor;
-        let window_height = window_size.height as f64 / scale_factor;
+            // get screen size and position
+            let screen_width = screen_size.width;
+            let screen_height = screen_size.height;
+            let screen_x = screen_position.x;
+            let screen_y = screen_position.y;
 
-        // get screen size and position
-        let screen_width = screen_size.width;
-        let screen_height = screen_size.height;
-        let screen_x = screen_position.x;
-        let screen_y = screen_position.y;
+            // calculate safe area for window
+            let safe_area_bottom = SAFE_AREA_BOTTOM as f64 / scale_factor;
+            let min_x = screen_x;
+            let max_x = (screen_x + screen_width - window_width).max(min_x);
+            let min_y = screen_y;
+            let max_y = (screen_y + screen_height - window_height - safe_area_bottom).max(min_y);
 
-        // calculate safe area for window
-        let safe_area_bottom = SAFE_AREA_BOTTOM as f64 / scale_factor;
-        let min_x = screen_x;
-        let max_x = (screen_x + screen_width - window_width).max(min_x);
-        let min_y = screen_y;
-        let max_y = (screen_y + screen_height - window_height - safe_area_bottom).max(min_y);
-
-        // clamp window position to safe area
-        LogicalPosition {
-            x: placement.window_position.x.clamp(min_x, max_x),
-            y: placement.window_position.y.clamp(min_y, max_y),
-        }
-    } else {
-        // use window position directly if screen info is not available
-        placement.window_position
-    };
-
-    window.set_position(Position::Logical(position))?;
-
-    // show and focus window
-    if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
-        show_window(&app, "popup");
-    }
-
-    // wait for initialization and emit event
-    wait_and_emit(&POPUP_INITIALIZED, window, payload);
-
-    Ok(())
-}
-
-/// Ensure toolbar window exists, creating it dynamically if needed.
-/// Returns the toolbar WebviewWindow handle.
-fn ensure_toolbar_window(app: &AppHandle) -> Result<WebviewWindow, AppError> {
-    // return existing window if it's already alive
-    if let Some(window) = app.get_webview_window("toolbar") {
-        return Ok(window);
-    }
-
-    // reset initialization flag for the new window
-    TOOLBAR_INITIALIZED.store(false, Ordering::Relaxed);
-
-    // create toolbar window dynamically
-    let window = WebviewWindowBuilder::new(app, "toolbar", WebviewUrl::App("/toolbar".into()))
-        .inner_size(1000.0, 50.0)
-        .visible(false)
-        .shadow(false)
-        .decorations(false)
-        .transparent(true)
-        .skip_taskbar(true)
-        .always_on_top(true)
-        .resizable(false)
-        .focused(false)
-        .build()?;
-
-    // setup macOS NSPanel integration
-    #[cfg(target_os = "macos")]
-    {
-        use tauri_nspanel::{
-            CollectionBehavior, ManagerExt, PanelLevel, StyleMask, WebviewWindowExt,
+            // clamp window position to safe area
+            LogicalPosition {
+                x: placement.window_position.x.clamp(min_x, max_x),
+                y: placement.window_position.y.clamp(min_y, max_y),
+            }
+        } else {
+            // use window position directly if screen info is not available
+            placement.window_position
         };
 
-        if let Ok(panel) = window.to_panel::<crate::ToolbarPanel>() {
-            let handler = crate::ToolbarPanelEventHandler::new();
+        window.set_position(Position::Logical(position))?;
 
-            // setup mouse hover activation
-            let app_handle = app.clone();
-            handler.on_mouse_entered(move |_event| {
-                if let Ok(panel) = app_handle.get_webview_panel("toolbar") {
-                    panel.make_key_window();
-                    let _ = app_handle.emit("toolbar-entered", ());
-                }
-            });
-
-            let app_handle = app.clone();
-            handler.on_mouse_exited(move |_event| {
-                if let Ok(panel) = app_handle.get_webview_panel("toolbar") {
-                    panel.resign_key_window();
-                    let _ = app_handle.emit("toolbar-exited", ());
-                }
-            });
-
-            panel.set_level(PanelLevel::Custom(5).value());
-            panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
-            panel.set_collection_behavior(
-                CollectionBehavior::new()
-                    .full_screen_auxiliary()
-                    .can_join_all_spaces()
-                    .into(),
-            );
-            panel.set_event_handler(Some(handler.as_ref()));
+        // show and focus window
+        if !POPUP_INITIALIZED.load(Ordering::Relaxed) {
+            show_window(&app, "popup");
         }
+
+        // wait for initialization and emit event
+        wait_and_emit(&POPUP_INITIALIZED, window, payload);
+    } else {
+        return Err("Popup window not found".into());
     }
 
-    // setup close-requested handler to destroy instead of hide
-    let app_handle = app.clone();
-    window.on_window_event(move |event| {
-        if let WindowEvent::CloseRequested { api, .. } = event {
-            api.prevent_close();
-            destroy_toolbar_window(&app_handle);
-        }
-    });
-
-    // prevent position deviation on first show
-    let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
-        width: 1.0,
-        height: 1.0,
-    }));
-
-    Ok(window)
-}
-
-/// Destroy toolbar window to free WebView memory.
-pub fn destroy_toolbar_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("toolbar") {
-        // emit hide event before destroying
-        let _ = app.emit("hide-toolbar", ());
-        let _ = window.destroy();
-        // reset initialization flag
-        TOOLBAR_INITIALIZED.store(false, Ordering::Relaxed);
-        log::info!("Toolbar window destroyed to free memory");
-    }
+    Ok(())
 }
 
 /// Show toolbar window and position it near the cursor.
 #[tauri::command]
 pub fn show_toolbar(app: AppHandle, payload: String, mouse: Option<bool>) -> Result<(), AppError> {
-    let window = ensure_toolbar_window(&app)?;
+    if let Some(window) = app.get_webview_window("toolbar") {
+        // position window near cursor
+        position_window_near_cursor(&window, mouse.unwrap_or(false))?;
 
-    // position window near cursor
-    position_window_near_cursor(&window, mouse.unwrap_or(false))?;
+        // show window without focusing
+        if !TOOLBAR_INITIALIZED.load(Ordering::Relaxed) {
+            show_toolbar_regardless(app.clone())?;
+        }
 
-    // show window without focusing
-    if !TOOLBAR_INITIALIZED.load(Ordering::Relaxed) {
-        show_toolbar_regardless(app.clone())?;
+        // wait for initialization and emit event
+        wait_and_emit(&TOOLBAR_INITIALIZED, window, payload);
+    } else {
+        return Err("Toolbar window not found".into());
     }
-
-    // wait for initialization and emit event
-    wait_and_emit(&TOOLBAR_INITIALIZED, window, payload);
 
     Ok(())
 }
@@ -504,19 +342,6 @@ pub fn show_window(app: &AppHandle, label: &str) -> Option<WebviewWindow> {
 
 /// Hide window.
 pub fn hide_window(app: &AppHandle, label: &str) -> Option<WebviewWindow> {
-    // destroy dynamic windows to free WebView memory
-    match label {
-        "popup" => {
-            destroy_popup_window(app);
-            return None;
-        }
-        "toolbar" => {
-            destroy_toolbar_window(app);
-            return None;
-        }
-        _ => {}
-    }
-
     if let Some(window) = app.get_webview_window(label) {
         let _ = window.hide();
 

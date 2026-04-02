@@ -379,7 +379,7 @@
             <Button icon={CopySimpleIcon} onclick={() => codeMirror?.copy()} />
           {/if}
           <div class="divider mx-0 my-auto divider-horizontal h-4 w-1 opacity-50"></div>
-          <Button icon={XIcon} onclick={() => currentWindow.close()} />
+          <Button icon={XIcon} onclick={() => currentWindow.hide()} />
         </div>
       </div>
       <!-- popup window body -->
