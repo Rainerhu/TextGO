@@ -25,22 +25,6 @@
         "hiddenTitle": true,
         "titleBarStyle": "Overlay",
         "trafficLightPosition": { "x": 16, "y": 18 }
-      },
-      {
-        "label": "toolbar",
-        "url": "/toolbar",
-        "width": 1000,
-        "height": 50,
-        "visible": false,
-        "shadow": false,
-        "decorations": false,
-        "transparent": true,
-        "skipTaskbar": true,
-        "alwaysOnTop": true,
-        "resizable": false,
-        "focusable": false,
-        "focus": false,
-        "acceptFirstMouse": true
       }
     ],
     "security": {

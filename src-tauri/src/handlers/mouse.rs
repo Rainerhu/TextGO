@@ -1,4 +1,4 @@
-use crate::commands::{get_selection, is_blocked};
+use crate::commands::{destroy_toolbar_window, get_selection, is_blocked};
 use crate::error::AppError;
 use crate::platform;
 use crate::{
@@ -322,21 +322,26 @@ fn emit_event(shortcut: &str, skip_selection: Option<bool>) -> Result<(), AppErr
 
 /// Hide toolbar if click is outside its bounds.
 fn hide_toolbar(check_position: bool) -> Result<(), AppError> {
-    // get toolbar window
-    let toolbar = APP_HANDLE
+    // get toolbar window (may not exist if dynamically destroyed)
+    let toolbar = match APP_HANDLE
         .lock()?
         .as_ref()
         .and_then(|app| app.get_webview_window("toolbar"))
-        .ok_or("Toolbar window not available")?;
+    {
+        Some(w) => w,
+        None => return Ok(()), // toolbar not alive, nothing to hide
+    };
 
     // check if toolbar is visible
     if !toolbar.is_visible().unwrap_or(false) {
         return Ok(());
     }
 
-    // if no need to check position, hide directly
+    // if no need to check position, destroy directly
     if !check_position {
-        let _ = toolbar.close();
+        if let Some(app) = APP_HANDLE.lock()?.as_ref() {
+            destroy_toolbar_window(app);
+        }
         return Ok(());
     }
 
@@ -368,8 +373,9 @@ fn hide_toolbar(check_position: bool) -> Result<(), AppError> {
         || click_y > toolbar_y + toolbar_height;
 
     if is_outside {
-        // the close request is intercepted in lib.rs to emit hide event
-        let _ = toolbar.close();
+        if let Some(app) = APP_HANDLE.lock()?.as_ref() {
+            destroy_toolbar_window(app);
+        }
     }
 
     Ok(())

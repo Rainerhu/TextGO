@@ -249,67 +249,8 @@ fn setup_app(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         }),
     );
 
-    // setup toolbar window
-    setup_window(
-        app,
-        "toolbar",
-        #[allow(unused_variables)]
-        Some(|window: &WebviewWindow, app: &AppHandle| {
-            // convert to panel on macOS
-            #[cfg(target_os = "macos")]
-            {
-                if let Ok(panel) = window.to_panel::<ToolbarPanel>() {
-                    let handler = ToolbarPanelEventHandler::new();
-
-                    // setup mouse hover activation
-                    let app_handle = app.clone();
-                    let window_label = window.label().to_string();
-                    handler.on_mouse_entered(move |_event| {
-                        if let Ok(panel) = app_handle.get_webview_panel(&window_label) {
-                            panel.make_key_window();
-                            let _ = app_handle.emit("toolbar-entered", ());
-                        }
-                    });
-
-                    let app_handle = app.clone();
-                    let window_label = window.label().to_string();
-                    handler.on_mouse_exited(move |_event| {
-                        if let Ok(panel) = app_handle.get_webview_panel(&window_label) {
-                            panel.resign_key_window();
-                            let _ = app_handle.emit("toolbar-exited", ());
-                        }
-                    });
-
-                    // set the window to custom level 5
-                    // above normal floating windows (level 4)
-                    panel.set_level(PanelLevel::Custom(5).value());
-
-                    // prevent app activation when clicked
-                    panel.set_style_mask(StyleMask::empty().nonactivating_panel().into());
-
-                    // allow display over fullscreen windows and on all spaces
-                    panel.set_collection_behavior(
-                        CollectionBehavior::new()
-                            .full_screen_auxiliary()
-                            .can_join_all_spaces()
-                            .into(),
-                    );
-
-                    // attach the event handler
-                    panel.set_event_handler(Some(handler.as_ref()));
-                }
-            }
-
-            // prevent position deviation on first show
-            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
-                width: 1.0,
-                height: 1.0,
-            }));
-        }),
-    );
-
-    // popup window is created dynamically on demand (see commands/window.rs)
-    // no setup needed here — it will be created when show_popup is called
+    // toolbar and popup windows are created dynamically on demand
+    // (see commands/window.rs ensure_toolbar_window / ensure_popup_window)
 
     // listen for deep link URLs
     app.deep_link().on_open_url(move |event| {

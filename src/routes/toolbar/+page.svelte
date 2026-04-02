@@ -488,16 +488,16 @@
       if (isLazy && !selection) {
         selection = await invoke('get_selection', { mouse: true });
         if (!selection || !selection.trim()) {
-          // no text selected, hide toolbar
-          await currentWindow.hide();
+          // no text selected, close toolbar
+          await currentWindow.close();
           return;
         }
       }
 
       // get current window placement
       const placement = await windowPlacement();
-      // hide the toolbar window
-      await currentWindow.hide();
+      // close the toolbar window
+      await currentWindow.close();
 
       if (action.rule.preview) {
         if (action.rule.outputMode === 'replace') {
