@@ -247,6 +247,7 @@ export const lmstudioHost = persisted<string>('lmstudioHost', '');
 // API keys for Cloud LLM providers
 export const openrouterApiKey = persisted<string>('openrouterApiKey', '', { encrypt, decrypt });
 export const openaiApiKey = persisted<string>('openaiApiKey', '', { encrypt, decrypt });
+export const deepseekApiKey = persisted<string>('deepseekApiKey', '', { encrypt, decrypt });
 export const anthropicApiKey = persisted<string>('anthropicApiKey', '', { encrypt, decrypt });
 export const geminiApiKey = persisted<string>('geminiApiKey', '', { encrypt, decrypt });
 export const xaiApiKey = persisted<string>('xaiApiKey', '', { encrypt, decrypt });
@@ -254,6 +255,7 @@ export const xaiApiKey = persisted<string>('xaiApiKey', '', { encrypt, decrypt }
 // Custom base URLs for Cloud LLM providers
 export const openrouterBaseUrl = persisted<string>('openrouterBaseUrl', '');
 export const openaiBaseUrl = persisted<string>('openaiBaseUrl', '');
+export const deepseekBaseUrl = persisted<string>('deepseekBaseUrl', '');
 export const anthropicBaseUrl = persisted<string>('anthropicBaseUrl', '');
 export const geminiBaseUrl = persisted<string>('geminiBaseUrl', '');
 export const xaiBaseUrl = persisted<string>('xaiBaseUrl', '');

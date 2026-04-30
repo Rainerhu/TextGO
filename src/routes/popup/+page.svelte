@@ -121,7 +121,9 @@
         messages: messages,
         max_tokens: entry.maxTokens,
         temperature: entry.temperature,
-        top_p: entry.topP
+        top_p: entry.topP,
+        frequency_penalty: entry.frequencyPenalty,
+        presence_penalty: entry.presencePenalty
       });
 
       // save reply content

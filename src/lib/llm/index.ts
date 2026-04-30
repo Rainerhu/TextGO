@@ -1,9 +1,10 @@
 import type { LLMProvider } from '$lib/types';
-import type { LLMClient } from './base';
+import type { ChatRequest, ExtendedChatParams, LLMClient } from './base';
 
 import { providers } from '$lib/stores.svelte';
 import { AnthropicClient } from './anthropic';
 import { OpenAICompatibleClient } from './base';
+import { DeepSeekClient } from './deepseek';
 import { GeminiClient } from './google';
 import { LMStudioClient } from './lmstudio';
 import { OllamaClient } from './ollama';
@@ -36,6 +37,8 @@ export function createLLMClient(provider: LLMProvider | string): LLMClient {
       return new OpenRouterClient();
     case 'openai':
       return new OpenAIClient();
+    case 'deepseek':
+      return new DeepSeekClient();
     case 'anthropic':
       return new AnthropicClient();
     case 'google':
@@ -55,4 +58,4 @@ export function createLLMClient(provider: LLMProvider | string): LLMClient {
 
 // export types for external usage
 export type { ChatCompletionMessageParam as ChatMessage } from 'openai/resources/chat/completions';
-export type { LLMClient, LLMProvider };
+export type { ChatRequest, ExtendedChatParams, LLMClient, LLMProvider };

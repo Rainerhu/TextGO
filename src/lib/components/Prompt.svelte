@@ -18,7 +18,9 @@ ${m.prompt_variables_tip()}
     modelName: text().maxlength(64),
     maxTokens: number().min(1).required(false),
     temperature: range().min(0).max(2).step(0.1).required(false),
-    topP: range().min(0).max(1).step(0.1).required(false)
+    topP: range().min(0).max(1).step(0.1).required(false),
+    frequencyPenalty: range().min(-2).max(2).step(0.1).required(false),
+    presencePenalty: range().min(-2).max(2).step(0.1).required(false)
   }));
 
   // default values
@@ -37,6 +39,7 @@ ${m.prompt_variables_tip()}
   import { Loading } from '$lib/states.svelte';
   import {
     anthropicApiKey,
+    deepseekApiKey,
     geminiApiKey,
     openaiApiKey,
     openrouterApiKey,
@@ -59,6 +62,8 @@ ${m.prompt_variables_tip()}
   let maxTokens: number | undefined = $state(undefined);
   let temperature: number | undefined = $state(DEFAULT_TEMPERATURE);
   let topP: number | undefined = $state(DEFAULT_TOP_P);
+  let frequencyPenalty: number | undefined = $state(undefined);
+  let presencePenalty: number | undefined = $state(undefined);
 
   // fill form fields
   const fillForm = (prompt: Prompt) => {
@@ -71,6 +76,8 @@ ${m.prompt_variables_tip()}
     maxTokens = prompt.maxTokens;
     temperature = prompt.temperature;
     topP = prompt.topP;
+    frequencyPenalty = prompt.frequencyPenalty;
+    presencePenalty = prompt.presencePenalty;
   };
 
   // show modal dialog
@@ -95,6 +102,14 @@ ${m.prompt_variables_tip()}
     fillForm(prompt);
     modal.show();
   };
+
+  /**
+   * Whether the current provider supports frequency/presence penalty.
+   * Most OpenAI-compatible APIs support these, but some local providers may not.
+   */
+  const supportsPenalty = $derived(
+    !['ollama', 'lmstudio'].includes(modelProvider)
+  );
 
   /**
    * Save prompt to persistent storage.
@@ -133,6 +148,8 @@ ${m.prompt_variables_tip()}
       prompt.maxTokens = maxTokens;
       prompt.temperature = temperature;
       prompt.topP = topP;
+      prompt.frequencyPenalty = supportsPenalty ? frequencyPenalty : undefined;
+      prompt.presencePenalty = supportsPenalty ? presencePenalty : undefined;
       alert(m.prompt_updated_success());
     } else {
       // add new prompt
@@ -145,7 +162,9 @@ ${m.prompt_variables_tip()}
         model: modelName,
         maxTokens: maxTokens,
         temperature: temperature,
-        topP: topP
+        topP: topP,
+        frequencyPenalty: supportsPenalty ? frequencyPenalty : undefined,
+        presencePenalty: supportsPenalty ? presencePenalty : undefined
       });
       // reset form
       promptName = '';
@@ -157,6 +176,8 @@ ${m.prompt_variables_tip()}
       maxTokens = undefined;
       temperature = DEFAULT_TEMPERATURE;
       topP = DEFAULT_TOP_P;
+      frequencyPenalty = undefined;
+      presencePenalty = undefined;
       alert(m.prompt_added_success());
     }
     modal.close();
@@ -188,6 +209,7 @@ ${m.prompt_variables_tip()}
               { value: 'lmstudio', label: 'LM Studio' },
               { value: 'openrouter', label: 'OpenRouter', disabled: !openrouterApiKey.current },
               { value: 'openai', label: 'OpenAI', disabled: !openaiApiKey.current },
+              { value: 'deepseek', label: 'DeepSeek', disabled: !deepseekApiKey.current },
               { value: 'anthropic', label: 'Anthropic', disabled: !anthropicApiKey.current },
               { value: 'google', label: 'Google', disabled: !geminiApiKey.current },
               { value: 'xai', label: 'xAI', disabled: !xaiApiKey.current },
@@ -259,6 +281,38 @@ ${m.prompt_variables_tip()}
             </div>
             <span class="w-7 text-base font-light tracking-widest">{topP?.toFixed(1)}</span>
           </label>
+          <!-- frequency penalty (only for providers that support it) -->
+          {#if supportsPenalty}
+            <Label tip={m.frequency_penalty_tip()}>{m.frequency_penalty()}</Label>
+            <label class="flex items-center gap-4">
+              <div class="grow">
+                <input class="range w-full text-emphasis range-xs" {...schema.frequencyPenalty} bind:value={frequencyPenalty} />
+                <div class="mt-2 flex justify-between pl-1 text-xs opacity-70">
+                  <span>-2</span>
+                  <span>-1</span>
+                  <span>0</span>
+                  <span>1</span>
+                  <span>2</span>
+                </div>
+              </div>
+              <span class="w-7 text-base font-light tracking-widest">{frequencyPenalty?.toFixed(1) ?? '-'}</span>
+            </label>
+            <!-- presence penalty -->
+            <Label tip={m.presence_penalty_tip()}>{m.presence_penalty()}</Label>
+            <label class="flex items-center gap-4">
+              <div class="grow">
+                <input class="range w-full text-emphasis range-xs" {...schema.presencePenalty} bind:value={presencePenalty} />
+                <div class="mt-2 flex justify-between pl-1 text-xs opacity-70">
+                  <span>-2</span>
+                  <span>-1</span>
+                  <span>0</span>
+                  <span>1</span>
+                  <span>2</span>
+                </div>
+              </div>
+              <span class="w-7 text-base font-light tracking-widest">{presencePenalty?.toFixed(1) ?? '-'}</span>
+            </label>
+          {/if}
         </div>
       </div>
     </fieldset>

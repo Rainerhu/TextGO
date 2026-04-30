@@ -124,6 +124,10 @@ export type ChatOptions = {
   temperature?: number;
   /** Top-p (nucleus sampling) for response generation. */
   topP?: number;
+  /** Frequency penalty for response generation. */
+  frequencyPenalty?: number;
+  /** Presence penalty for response generation. */
+  presencePenalty?: number;
 };
 
 /**

@@ -5,12 +5,14 @@
   import { LLM_PROVIDERS } from '$lib/constants';
   import { buildFormSchema } from '$lib/constraint';
   import { dumpExtension } from '$lib/helpers';
-  import { Anthropic, Gemini, LMStudio, Ollama, OpenAI, OpenRouter, XAI } from '$lib/icons';
+  import { Anthropic, DeepSeek, Gemini, LMStudio, Ollama, OpenAI, OpenRouter, XAI } from '$lib/icons';
   import { m } from '$lib/paraglide/messages';
   import { Loading } from '$lib/states.svelte';
   import {
     anthropicApiKey,
     anthropicBaseUrl,
+    deepseekApiKey,
+    deepseekBaseUrl,
     geminiApiKey,
     geminiBaseUrl,
     lmstudioHost,
@@ -48,6 +50,7 @@
     lmstudio: LMStudio,
     openrouter: OpenRouter,
     openai: OpenAI,
+    deepseek: DeepSeek,
     anthropic: Anthropic,
     google: Gemini,
     xai: XAI
@@ -64,6 +67,8 @@
     openrouterBaseUrl: text().maxlength(256),
     openaiApiKey: password().maxlength(256),
     openaiBaseUrl: text().maxlength(256),
+    deepseekApiKey: password().maxlength(256),
+    deepseekBaseUrl: text().maxlength(256),
     anthropicApiKey: password().maxlength(256),
     anthropicBaseUrl: text().maxlength(256),
     geminiApiKey: password().maxlength(256),
@@ -274,6 +279,19 @@
         placeholder={m.custom_base_url({ defaultUrl: 'https://api.openai.com/v1' })}
         {...schema.openaiBaseUrl}
         bind:value={openaiBaseUrl.current}
+      />
+      <Label icon={DeepSeek}>DeepSeek</Label>
+      <input
+        class="input w-full"
+        placeholder={m.api_key({ provider: 'DeepSeek' })}
+        {...schema.deepseekApiKey}
+        bind:value={deepseekApiKey.current}
+      />
+      <input
+        class="input input-sm w-full"
+        placeholder={m.custom_base_url({ defaultUrl: 'https://api.deepseek.com/v1' })}
+        {...schema.deepseekBaseUrl}
+        bind:value={deepseekBaseUrl.current}
       />
       <Label icon={Anthropic}>Anthropic</Label>
       <input

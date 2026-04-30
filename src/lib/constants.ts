@@ -1,7 +1,7 @@
 /**
  * Large Language Model providers.
  */
-export const LLM_PROVIDERS = ['ollama', 'lmstudio', 'openrouter', 'openai', 'anthropic', 'google', 'xai'] as const;
+export const LLM_PROVIDERS = ['ollama', 'lmstudio', 'openrouter', 'openai', 'deepseek', 'anthropic', 'google', 'xai'] as const;
 
 /**
  * Mouse drag shortcut.

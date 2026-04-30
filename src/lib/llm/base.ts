@@ -5,6 +5,21 @@ import type {
 } from 'openai/resources/chat/completions';
 
 /**
+ * Extended parameters beyond the standard OpenAI params.
+ */
+export interface ExtendedChatParams {
+  /** Penalizes tokens based on their frequency in the text so far. */
+  frequency_penalty?: number | null;
+  /** Penalizes tokens based on whether they appear in the text so far. */
+  presence_penalty?: number | null;
+}
+
+/**
+ * Full request type combining OpenAI params with extensions.
+ */
+export type ChatRequest = ChatCompletionParams & ExtendedChatParams;
+
+/**
  * LLM Client interface.
  */
 export interface LLMClient {
@@ -14,7 +29,7 @@ export interface LLMClient {
    * @param request - chat completion request parameters
    * @returns an async iterable that yields response chunks
    */
-  chat(request: ChatCompletionParams): AsyncIterable<string>;
+  chat(request: ChatRequest): AsyncIterable<string>;
 
   /**
    * Abort the ongoing request.
@@ -35,7 +50,7 @@ export abstract class OpenAICompatibleClient implements LLMClient {
     this.apiKey = apiKey;
   }
 
-  async *chat(request: ChatCompletionParams): AsyncIterable<string> {
+  async *chat(request: ChatRequest): AsyncIterable<string> {
     this.abortController = new AbortController();
 
     try {
@@ -47,13 +62,18 @@ export abstract class OpenAICompatibleClient implements LLMClient {
       };
       if (request.max_tokens != null) {
         body.max_tokens = request.max_tokens;
-        body.max_completion_tokens = request.max_tokens;
       }
       if (request.temperature != null) {
         body.temperature = request.temperature;
       }
       if (request.top_p != null) {
         body.top_p = request.top_p;
+      }
+      if (request.frequency_penalty != null) {
+        body.frequency_penalty = request.frequency_penalty;
+      }
+      if (request.presence_penalty != null) {
+        body.presence_penalty = request.presence_penalty;
       }
 
       // send request to OpenAI-compatible endpoint using Tauri's fetch
